@@ -12,7 +12,7 @@ def create_default():
     base_path = os.path.join(Config.BASE_PATH)
     if not os.path.isdir(base_path):
         os.mkdir(base_path)
-        print('Directory BASE_PATH created')
+    print('Directory BASE_PATH created')
     
     for letter in 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ':
         letter_path = os.path.join(Config.BASE_PATH, letter)

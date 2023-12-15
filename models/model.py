@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from config import Config
 
 
-engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, echo=True)
+engine = create_engine(Config.DATABASE_URI, echo=True)
 
 
 def default_time():
