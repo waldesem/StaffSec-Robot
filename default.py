@@ -7,7 +7,7 @@ from models.model import Base, Region, Status, Conclusion, Category, engine
 from models.classes import Regions, Statuses, Conclusions, Categories
 
 
-def create_default():
+def create_defaults():
     """Create default values"""
     base_path = os.path.join(Config.BASE_PATH)
     if not os.path.isdir(base_path):
@@ -32,4 +32,4 @@ def create_default():
     print('Models created and filled')
 
 if __name__ == '__main__':
-    create_default()
+    create_defaults()
