@@ -3,7 +3,13 @@ import shutil
 from datetime import date
 
 from config import Config
-from parsers.parser import parse_main, parse_info
+from parsers.screendata import parse_main, parse_info
+import logging
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG, filename='log.txt', filemode='w')
+logging.getLogger(__name__).setLevel(logging.DEBUG)
 
 
 def main():

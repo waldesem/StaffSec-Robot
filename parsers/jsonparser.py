@@ -2,9 +2,40 @@ import re
 import json
 from datetime import datetime
 
-from ..models.model import Region, Status, Category
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..models.model import Person, Region, Status, Category, Staff, Document, \
+    Address, Contact, Workplace, Affilation, engine
 from ..models.classes import Statuses, Categories
 
+
+def json_to_db(json_path):
+    for json_file in json_path:
+        json_data = JsonFile(json_file)
+        with Session(engine) as session:
+            person = session.execute(
+            select(Person)
+            .filter(Person.fullname.ilike(json_data['fullname']),
+                    Person.birthday==json_data['birthday'])
+            ).one_or_none()
+            if person:
+                for k, v in json_data.resume.items():
+                    setattr(person, k, v)
+            else:
+                person = Person(**json_data.resume)
+                session.add(person)
+                session.flush()
+            person.status_id = Status().get_id(Statuses.new.value)
+
+            models = [Staff, Document, Address, Contact, Workplace, Affilation]
+            items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
+                            json_data.contacts, json_data.workplaces, json_data.affilation]
+            for model, items in zip(models, items_lists):
+                for item in items:
+                    if item:
+                        session.add(model(**item | {'person_id': person.id}))
+            session.commit()
 
 class JsonFile:
     """ Create class for import data from json file"""

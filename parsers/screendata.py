@@ -3,8 +3,14 @@ import shutil
 from datetime import datetime, date
 
 import openpyxl
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from config import Config
+from models.model import engine,Person, Inquiry, Check
+from .excelparser import excel_to_db
+from .screendata import screen_iquiry_data, screen_registry_data
+from .jsonparser import json_to_db
 
 
 def parse_main():
@@ -45,7 +51,7 @@ def parse_main():
                         ws['L' + str(n)].hyperlink = str(lnk)  # записывает в книгу
                         shutil.move(os.path.join(Config.WORK_DIR, sbd), lnk)
                         
-            chart_check(ws, num_row, 'registry_id', Registry)
+            screen_registry_data(ws, num_row)
         wb.save(Config.MAIN_FILE)
     else:
         wb.close()
@@ -56,7 +62,7 @@ def parse_info():
     ws = wb.worksheets[0]
     num_row = range_row(ws['G1':'G3000'])
     if len(num_row):
-        chart_check(ws, num_row, 'iquery_id', Inquery)
+        screen_iquiry_data(ws, num_row)
     wb.close()
 
 
@@ -72,3 +78,53 @@ def range_row(sheet):
     return row_num
 
         
+def screen_iquiry_data(sheet, num_row): 
+    for num in num_row:
+        chart = {'info': sheet[f'E{num}'].value,
+                 'initiator': sheet[f'F{num}'].value,
+                 'deadline': datetime.strftime(datetime.strptime(str(sheet[f'G{num}'].value).\
+                             strip(), '%d.%m.%Y'), '%Y-%m-%d'),
+                 'fullname': sheet['A' + str(num)].value,
+                 'birthday': sheet['B' + str(num)].value}
+        with Session(engine) as sess:
+            person = sess.execute(
+                select(Person)
+                .filter_by(fullname=chart['fullname'], 
+                           birthday=chart['birthday'])
+                ).scalar_one_or_none()
+            if not person:
+                person = Person(Person(fullname=chart['fullname'],
+                                birthday=chart['birthday']))
+                sess.add(person)
+                sess.flush()
+            sess.add(Inquiry(info = chart['info'],
+                                initiator = chart['initiator'],
+                                deadline = chart['deadline'],
+                                person_id = person.id))
+            sess.commit()
+
+
+def screen_registry_data(sheet, num_row):
+    for num in num_row:
+        chart = {'fullname': sheet['A' + str(num)].value,
+                 'birthday': sheet['B' + str(num)].value,
+                 'decision': sheet[f'J{num}'].value,
+                 'deadline': datetime.strftime(datetime.strptime(str(sheet[f'K{num}'].value).\
+                             strip(), '%d.%m.%Y'), '%Y-%m-%d'),
+                 'url': sheet[f'L{num}'].value}
+        with Session(engine) as sess:
+            person = sess.execute(
+                select(Person)
+                .filter_by(fullname=chart['fullname'], 
+                           birthday=chart['birthday'])
+                ).scalar_one_or_none()
+            if not person:
+                person = Person(Person(fullname=chart['fullname'],
+                                birthday=chart['birthday']))
+                sess.add(person)
+                sess.flush()
+            sess.add(Check(decision = chart['decision'],
+                           deadline = chart['deadline'],
+                           url = chart['url'],
+                           person_id = person.id))
+            sess.commit()
