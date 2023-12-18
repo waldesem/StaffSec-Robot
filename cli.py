@@ -5,16 +5,18 @@ from sqlalchemy.orm import Session
 
 from config import Config
 from models.model import Base, Region, Status, Conclusion, Category, engine
+from models._model import _engine
 from models.classes import Regions, Statuses, Conclusions, Categories
 
 
 """Parse command line arguments"""
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--create', action='store_true', help='Create default values')
+parser.add_argument('-d', '--deprecate', action='store_true', help='Create deprecated values')
 args = parser.parse_args()
 
 
-def create_default():
+def create():
     """Create default values"""
     if not os.path.isdir(Config.WORK_DIR):
         os.mkdir(Config.WORK_DIR)
@@ -46,8 +48,14 @@ def create_default():
     print('Models created and filled')
 
 
+def deprecate():
+    Base.metadata.create_all(_engine)
+
+
 if __name__ == '__main__':
     if args.create:
-        create_default()
+        create()
+    elif args.deprecate:
+        deprecate()
     else:
-        print('Nothing to do')
+        parser.print_help()

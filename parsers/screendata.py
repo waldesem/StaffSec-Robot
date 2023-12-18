@@ -30,7 +30,8 @@ def parse_main():
             for f in subdir:
                 subdir_path = os.path.join(Config.WORK_DIR[0:-1], f)
                 for file in os.listdir(subdir_path):
-                    if (file.startswith("Заключение") or file.startswith("Результат")) and (file.endswith("xlsm") or file.endswith("xlsx")):
+                    if (file.startswith("Заключение") or file.startswith("Результаты")) \
+                        and (file.endswith("xlsm") or file.endswith("xlsx")):
                         excel_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))
                     elif file.endswith("json"):
                         json_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))
@@ -46,7 +47,7 @@ def parse_main():
                 for sub in subdir:
                     if str(ws['B' + str(n)].value.strip().lower()) == sub.strip().lower():
                         sbd = ws['B' + str(n)].value.strip()
-                        lnk = os.path.join(Config.ARCHIVE_DIR, sbd[0][0], f"{sbd} - {ws['A' + str(n)].value}")
+                        lnk = os.path.join(Config.ARCHIVE_DIR_2, sbd[0][0], f"{sbd} - {ws['A' + str(n)].value}")
                         ws['L' + str(n)].hyperlink = str(lnk)  # записывает в книгу
                         shutil.move(os.path.join(Config.WORK_DIR, sbd), lnk)
                         

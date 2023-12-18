@@ -9,4 +9,4 @@ class Config:
     ARCHIVE_DIR_2 = os.path.join(ARCHIVE_DIR, 'Персонал-2')
     MAIN_FILE = os.path.join(WORK_DIR, 'Кандидаты.xlsm')
     INFO_FILE = os.path.join(WORK_DIR, 'Запросы по работникам.xlsx')
-    DATABASE_URI = 'sqlite:///' + os.path.join(BASE_PATH, 'test.db')
+    DATABASE_URI = 'sqlite:///' + os.path.join(BASE_PATH, 'personal.db')

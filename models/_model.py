@@ -1,16 +1,15 @@
-from sqlalchemy.orm import *
-from sqlalchemy import *
-
-ENGINE = create_engine(r'sqlite:////home/semenenko/MyProjects/personal.db', echo=True)
-
-Base = declarative_base()
+from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy import create_engine, Column, Integer, Text, ForeignKey
 
 
-class Personal(Base):
+_engine = create_engine('sqlite:///' + '/home/semenenko/MyProjects/personal.db')
+
+
+class Base(DeclarativeBase):
     __abstract__ = True
 
 
-class Candidate(Personal):
+class Candidate(Base):
     """ Create model for candidates dates"""
 
     __tablename__ = 'candidates'
@@ -38,7 +37,7 @@ class Candidate(Personal):
     registr = relationship('Registr', cascade="all, delete", back_populates='candidate')
 
 
-class Check(Personal):
+class Check(Base):
     """ Create model for candidates checks"""
 
     __tablename__ = 'checks'
@@ -60,7 +59,7 @@ class Check(Personal):
     candidate = relationship('Candidate', back_populates='check')
 
 
-class Inquery(Personal):
+class Inquery(Base):
     """ Create model for candidates iqueries"""
 
     __tablename__ = 'iqueries'
@@ -75,7 +74,7 @@ class Inquery(Personal):
     candidate = relationship('Candidate', back_populates='inquery')
 
 
-class Registr(Personal):
+class Registr(Base):
     """ Create model for candidates iqueries"""
 
     __tablename__ = 'registries'
@@ -90,4 +89,4 @@ class Registr(Personal):
     candidate = relationship('Candidate', back_populates='registr')
 
 
-Personal.metadata.create_all(bind=ENGINE)
+Base.metadata.create_all(_engine)

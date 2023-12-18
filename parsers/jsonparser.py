@@ -11,14 +11,15 @@ from ..models.classes import Statuses, Categories
 
 
 def json_to_db(json_path):
-    for json_file in json_path:
-        json_data = JsonFile(json_file)
-        with Session(engine) as session:
+    with Session(engine) as session:
+        for json_file in json_path:
+            json_data = JsonFile(json_file)
             person = session.execute(
             select(Person)
             .filter(Person.fullname.ilike(json_data['fullname']),
                     Person.birthday==json_data['birthday'])
             ).one_or_none()
+            
             if person:
                 for k, v in json_data.resume.items():
                     setattr(person, k, v)
@@ -26,8 +27,7 @@ def json_to_db(json_path):
                 person = Person(**json_data.resume)
                 session.add(person)
                 session.flush()
-            person.status_id = Status().get_id(Statuses.new.value)
-
+            
             models = [Staff, Document, Address, Contact, Workplace, Affilation]
             items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
                             json_data.contacts, json_data.workplaces, json_data.affilation]
@@ -35,7 +35,7 @@ def json_to_db(json_path):
                 for item in items:
                     if item:
                         session.add(model(**item | {'person_id': person.id}))
-            session.commit()
+        session.commit()
 
 class JsonFile:
     """ Create class for import data from json file"""
@@ -46,8 +46,8 @@ class JsonFile:
 
             self.resume = {
                 'region_id': self.parse_region(),
-                'category_id': Category().get_id(Categories.candidate.name),
-                'status_id': Status().get_id(Statuses.new.name),
+                'category_id': Category().get_id(Categories.candidate.value),
+                'status_id': Status().get_id(Statuses.finish.value),
                 'fullname': self.parse_fullname(),
                 'previous': self.parse_previous(),
                 'birthday': self.parse_birthday(),
