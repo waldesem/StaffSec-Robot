@@ -4,8 +4,7 @@ import openpyxl
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models.model import Person, Status, Category, Staff, Document, \
-    Address, Contact, Workplace, Check, Robot, engine
+from ..models.model import Person, Status, Category, Check, Robot, engine
 from ..models.classes import Categories, Statuses
 
 
@@ -41,15 +40,6 @@ def excel_to_db(path_files):  # take path's to conclusions
             elif excel.person['robot']:
                 sess.add(Robot(**excel.person['robot'] | {'person_id': person_id}))
 
-            models = [Staff, Document, Address, Contact, Workplace]
-            items_lists = [excel.person['staff'], excel.person['passport'], 
-                           excel.person['addresses'], excel.person['contacts'], 
-                           excel.person['workplaces']]
-            for model, items in zip(models, items_lists):
-                for item in items:
-                    if item:
-                        sess.add(model(**item | {'person_id': person_id}))
-
             sess.commit()
 
 
@@ -67,128 +57,73 @@ class ExcelFile:
                 sheet = workbook.worksheets[1]
                 if str(sheet['K1'].value) == 'ФИО':
                     self.person.append(dict(resume = self.get_resume(sheet)))
-                    self.person.append(dict(passport = self.get_passport(sheet)))
-                    self.person.append(dict(staff = self.get_staffs(sheet)))
-                    self.person.append(dict(works = self.get_works(sheet)))
-                    self.person.append(dict(address = self.get_address(sheet)))
-                    self.person.append(dict(contacts = self.get_contacts(sheet)))
             else:
                 self.person.append(dict(resume = self.get_conclusion_resume(worksheet)))
-                self.person.append(dict(passport = self.get_conclusion_passport(worksheet)))
-                self.person.append(dict(staff = self.get_conclusion_staff(worksheet)))
-                self.person.append(dict(check = self.get_check(worksheet)))
+            self.person.append(dict(check = self.get_check(worksheet)))
         else:
+            self.person.append(dict(robot = self.get_robot(worksheet)))
             self.person.append(dict(robot = self.get_robot(worksheet)))
 
         workbook.close()
 
     @staticmethod
     def get_resume(sheet):
-        resume = dict(full_name=str(sheet['K3'].value).title().strip(),
-                        last_name=str(sheet['S3'].value).title().strip(),
-                        birthday=datetime.strftime(datetime.strptime(str(sheet['L3'].value).strip(),
-                                                                        '%d.%m.%Y'), '%Y-%m-%d'),
-                        birth_place=str(sheet['M3'].value).strip(),
+        resume = dict(fullname=str(sheet['K3'].value).title().strip(),
+                        birthday=datetime.strftime(
+                            datetime.strptime(str(sheet['L3'].value).strip(), 
+                                              '%d.%m.%Y'), '%Y-%m-%d'
+                                              ),
+                        birthplace=str(sheet['M3'].value).strip(),
                         country=str(sheet['T3'].value).strip(),
                         snils=str(sheet['U3'].value).strip(),
-                        inn=str(sheet['V3'].value).strip(),
-                        education=str(sheet['X3'].value).strip())
+                        inn=str(sheet['V3'].value).strip())
         return resume
 
     @staticmethod
-    def get_passport(sheet):
-        passports = [dict(series_passport=str(sheet['P3 '].value).strip(),
-                        number_passport=str(sheet['Q3 '].value).strip(),
-                        date_given=datetime.strftime(datetime.strptime(str(sheet['R3 '].value).strip(),
-                                                                        '%d.%m.%Y'), '%Y-%m-%d'))]
-        return passports
-
-    @staticmethod
-    def get_address(sheet):
-        address = [dict(type = 'Адрес регистрации', address=str(sheet['N3'].value).strip()), 
-                        dict(type = 'Адрес проживания', address=str(sheet['O3'].value).strip())]
-        return address
-
-
-    def get_contacts(sheet):
-        contacts = [dict(type = 'Телефон', contact=str(sheet['Y3 '].value).strip()),
-                    dict(type = 'e-mail', contact=str(sheet['Z3'].value).strip())]
-        return contacts
-
-    @staticmethod
-    def get_works(sheet):
-        works = [dict(period=str(sheet['AA3'].value).strip(), workplace=str(sheet['AB3'].value).strip(),
-                        address=str(sheet['AC3'].value).strip(), staff=sheet['AD3'].value.strip()),
-                    dict(period=str(sheet['AA4'].value).strip(), workplace=str(sheet['AB4'].value).strip(),
-                        address=str(sheet['AC4'].value).strip(), staff=sheet['AD4'].value.strip()),
-                    dict(period=str(sheet['AA5'].value).strip(), workplace=str(sheet['AB5'].value).strip(),
-                        address=str(sheet['AC5'].value).strip(), staff=sheet['AD5'].value.strip())]
-        return works
-
-    @staticmethod
-    def get_staffs(sheet):
-        staffs = [dict(staff=str(sheet['C3'].value).strip(), department=str(sheet['D3'].value).strip(),
-                        recruiter=str(sheet['E3'].value).strip())]
-        return staffs
-
-    @staticmethod
     def get_conclusion_resume(sheet):
-        resumes = {'full_name': sheet['C6'].value,
-                    'birthday': sheet['C8'].value,
-                    'previous_name': sheet['C7'].value}
+        resumes = {'fullname': sheet['C6'].value,
+                    'birthday': sheet['C8'].value}
+        return resumes
+    
+    @staticmethod
+    def get_robot_resume(sheet):
+        resumes = {'fullname': sheet['B4'].value,
+                    'birthday': datetime.strftime(
+                        datetime.strptime(str(sheet['B5'].value).strip(), 
+                                          '%d.%m.%Y'), '%Y-%m-%d'
+                                          )}
         return resumes
 
     @staticmethod
-    def get_conclusion_passport(sheet):
-        passports = [{'series_passport': sheet['C9'].value,
-                        'number_passport': sheet['D9'].value,
-                        'date_given': sheet['E9'].value}]
-        return passports
-
-    @staticmethod
-    def get_conclusion_staff(sheet):
-        staffs = [{'staff': sheet['C4'].value,
-                        'department': sheet['C5'].value}]
-        return staffs
-
-    @staticmethod
     def get_check(sheet):
-        checks = {'check_work_place':
-                            f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
-                            f"{sheet['D12'].value}; {sheet['C13'].value} - {sheet['D13'].value}",
-                        'check_cronos':
-                            f"{sheet['B14'].value}: {sheet['C14'].value}; {sheet['B15'].value}: "
-                            f"{sheet['C15'].value}",
-                        'check_cross': sheet['C16'].value,
-                        'check_passport': sheet['C17'].value,
-                        'check_debt': sheet['C18'].value,
-                        'check_bankruptcy': sheet['C19'].value,
-                        'check_bki': sheet['C20'].value,
-                        'check_affiliation': sheet['C21'].value,
-                        'check_internet': sheet['C22'].value,
-                        'resume': sheet['C23'].value,
-                        'date_check': datetime.strftime(datetime.strptime(str(sheet['C24'].value).\
-                            strip(), '%d.%m.%Y'), '%Y-%m-%d'),
-                        'officer': sheet['C25'].value}
+        checks = {
+            'workplace': f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
+                         f"{sheet['D12'].value}; {sheet['C13'].value} - {sheet['D13'].value}",
+            'cronos': f"{sheet['B14'].value}: {sheet['C14'].value}; {sheet['B15'].value}: "
+                      f"{sheet['C15'].value}",
+            'cros': sheet['C16'].value,
+            'document': sheet['C17'].value,
+            'debt': sheet['C18'].value,
+            'bankruptcy': sheet['C19'].value,
+            'bki': sheet['C20'].value,
+            'affiliation': sheet['C21'].value,
+            'internet': sheet['C22'].value,
+            'pfo': True if sheet['C2^'].value in ['Назначено', 
+                                                  'На испытательном сроке'] else False,
+            'addition': sheet['C28'].value,
+            'conclusion': sheet['C23'].value,
+            'officer': sheet['C25'].value}
         return checks
 
     @staticmethod
     def get_robot(sheet):
-        robot = {'check_work_place':
-                            f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
-                            f"{sheet['D12'].value}; {sheet['C13'].value} - {sheet['D13'].value}",
-                        'check_cronos':
-                            f"{sheet['B14'].value}: {sheet['C14'].value}; {sheet['B15'].value}: "
-                            f"{sheet['C15'].value}",
-                        'check_cross': sheet['C16'].value,
-                        'check_passport': sheet['C17'].value,
-                        'check_debt': sheet['C18'].value,
-                        'check_bankruptcy': sheet['C19'].value,
-                        'check_bki': sheet['C20'].value,
-                        'check_affiliation': sheet['C21'].value,
-                        'check_internet': sheet['C22'].value,
-                        'resume': sheet['C23'].value,
-                        'date_check': datetime.strftime(datetime.strptime(str(sheet['C24'].value).\
-                            strip(), '%d.%m.%Y'), '%Y-%m-%d'),
-                        'officer': sheet['C25'].value}
+        robot = {
+            'employee': sheet['B27'].value,
+            'terrorist': sheet['B17'].value,
+            'inn': sheet['B18'].value,
+            'bankruptcy': f"{sheet['B20'].value}, {sheet['B21'].value}, {sheet['B22'].value}",
+            'mvd': sheet['B23'].value,
+            'courts': sheet['B24'].value,
+            'bki': sheet['B25'].value,
+            }
         return robot

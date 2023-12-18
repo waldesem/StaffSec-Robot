@@ -125,36 +125,6 @@ class Person(Base):
     statuses: Mapped['Status'] = relationship(back_populates='persons')
     regions: Mapped['Region'] = relationship(back_populates='persons')
 
-    def has_status(self, *statuses):
-        """
-        Check if the current status of the object matches any of the given status values.
-        """
-        with engine.connect() as conn:
-            return any(self.status_id == [conn.execute(
-                select(Status)
-                .filter_by(status=status)
-                ).scalar_one_or_none().id for status in statuses])
-    
-    def has_category(self, *args):
-        """
-        Check if the current category of the object matches any of the given category values.
-        """
-        with engine.connect() as conn:
-            return any(self.category_id == [conn.execute(
-                select(Category)
-                .filter(Category.category.in_(category))
-                ).scalar_one_or_none().id for category in args])  
-    
-    def has_region(self, *args):
-        """
-        Check if the current region of the object matches any of the given region values.
-        """
-        with engine.connect() as conn:
-            return any(self.region_id == [conn.execute(
-                select(Region)
-                .filter(Region.region.in_(region))
-                ).scalar_one_or_none() for region in args])
-
 
 class Staff(Base):
     """ Create model for staff"""
@@ -297,13 +267,10 @@ class Robot(Base):
 
     id: Mapped[int] = mapped_column(nullable=False, unique=True, primary_key=True, autoincrement=True)
     employee: Mapped[str] = mapped_column(Text)
-    document: Mapped[str] = mapped_column(Text)
     inn: Mapped[str] = mapped_column(Text)
-    debt: Mapped[str] = mapped_column(Text)
     bankruptcy: Mapped[str] = mapped_column(Text)
     bki: Mapped[str] = mapped_column(Text)
     courts: Mapped[str] = mapped_column(Text)
-    affiliation: Mapped[str] = mapped_column(Text)
     terrorist: Mapped[str] = mapped_column(Text)
     mvd: Mapped[str] = mapped_column(Text)
     deadline: Mapped[datetime] = mapped_column(Date, default=default_time)
