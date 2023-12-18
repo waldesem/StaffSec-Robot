@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from config import Config
 from models.model import engine,Person, Inquiry, Check
 from .excelparser import excel_to_db
-from .screendata import screen_iquiry_data, screen_registry_data
 from .jsonparser import json_to_db
 
 
@@ -31,7 +30,7 @@ def parse_main():
             for f in subdir:
                 subdir_path = os.path.join(Config.WORK_DIR[0:-1], f)
                 for file in os.listdir(subdir_path):
-                    if file.startswith("Заключение") and (file.endswith("xlsm") or file.endswith("xlsx")):
+                    if (file.startswith("Заключение") or file.startswith("Результат")) and (file.endswith("xlsm") or file.endswith("xlsx")):
                         excel_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))
                     elif file.endswith("json"):
                         json_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))

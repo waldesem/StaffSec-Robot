@@ -324,3 +324,20 @@ class Inquiry(Base):
     deadline: Mapped[datetime] = mapped_column(Date, default=default_time)
     person_id: Mapped[int] = mapped_column(ForeignKey('persons.id'))
     persons: Mapped[List['Person']] = relationship(back_populates='inquiries')
+
+
+class Connect(Base):
+    """ Create model for persons connects"""
+    
+    __tablename__ = 'connects'
+
+    id: Mapped[int] = mapped_column(nullable=False, unique=True, primary_key=True, autoincrement=True)
+    company: Mapped[str] = mapped_column(String(255))
+    city: Mapped[str] = mapped_column(String(255))
+    fullname: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str] = mapped_column(String(255))
+    adding: Mapped[str] = mapped_column(String(255))
+    mobile: Mapped[str] = mapped_column(String(255))
+    mail: Mapped[str] = mapped_column(String(255))
+    comment: Mapped[str] = mapped_column(Text)
+    data: Mapped[datetime] = mapped_column(Date, default=default_time, onupdate=default_time)
