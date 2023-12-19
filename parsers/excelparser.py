@@ -4,7 +4,7 @@ import openpyxl
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models.model import Person, Status, Category, Check, Robot, engine
+from ..models.model import Conclusion, Person, Status, Category, Check, Robot, engine
 from ..models.classes import Categories, Statuses
 
 
@@ -111,7 +111,7 @@ class ExcelFile:
             'pfo': True if sheet['C2^'].value in ['Назначено', 
                                                   'На испытательном сроке'] else False,
             'addition': sheet['C28'].value,
-            'conclusion': sheet['C23'].value,
+            'conclusion': Conclusion().get_id(sheet['C23'].value),
             'officer': sheet['C25'].value}
         return checks
 

@@ -5,6 +5,7 @@ from sqlalchemy import Boolean, create_engine, ForeignKey, String, Text, Date, s
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from config import Config
+from ..models.classes import Conclusions
 
 
 engine = create_engine(Config.DATABASE_URI, echo=True)
@@ -217,7 +218,6 @@ class Check(Base):
 
     id: Mapped[int] = mapped_column(nullable=False, unique=True, primary_key=True, autoincrement=True)
     workplace: Mapped[str] = mapped_column(Text)
-    employee: Mapped[str] = mapped_column(Text)
     document: Mapped[str] = mapped_column(Text)
     inn: Mapped[str] = mapped_column(Text)
     debt: Mapped[str] = mapped_column(Text)
@@ -248,14 +248,18 @@ class Conclusion(Base):
     
     id: Mapped[int] = mapped_column(nullable=False, unique=True, primary_key=True, autoincrement=True)
     conclusion: Mapped[str] = mapped_column(String(255))
-    checks = relationship('Check', backref='conclusions')   
     checks: Mapped[List['Check']] = relationship(back_populates='conclusions')
 
     def get_id(self, conclusion):
         with engine.connect() as conn:
+            mapped = {
+                'согласовано': Conclusions.agreed.value,
+                'с комментарием': Conclusions.with_comment.value,
+                'отказ': Conclusions.denied.value
+            }
             result = conn.execute(
             select(Conclusion)
-            .filter(Conclusion.conclusion == conclusion)
+            .filter(Conclusion.conclusion == mapped.get(conclusion.lower(), Conclusions.canceled.value))
             ).scalar_one_or_none().id
             return result
 

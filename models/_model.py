@@ -88,5 +88,5 @@ class Registr(Base):
     registry_id = Column(Integer, ForeignKey('candidates.id'))
     candidate = relationship('Candidate', back_populates='registr')
 
-
+Base.metadata.drop_all(_engine)
 Base.metadata.create_all(_engine)
