@@ -51,76 +51,76 @@ def upgrade_db():
         sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
     )
 
-    # persons = sa.Table('persons', metadata)
+    persons = sa.Table('persons', metadata)
 
-    # for person in persons:
-    #     op.bulk_insert(staffs, [{
-    #         'position': person.staff, 
-    #         'department': person.department, 
-    #         'person_id': person.id
-    #         }])
+    for person in persons:
+        op.bulk_insert(staffs, [{
+            'position': person.staff, 
+            'department': person.department, 
+            'person_id': person.id
+            }])
 
-    # op.create_table(
-    #     'documents',
-    #     sa.Column('id', sa.Integer, primary_key=True, 
-    #               autoincrement=True, unique=True, nullable=False),
-    #     sa.Column('view', sa.String(255)),
-    #     sa.Column('series', sa.String(255)),
-    #     sa.Column('number', sa.String(255)),
-    #     sa.Column('agency', sa.Text()),
-    #     sa.Column('issue', sa.Date()),
-    #     sa.Column('person_id', sa.Integer()),
-    #     sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
-    # )
-    # documents = sa.Table('documents', op.get_bind())
-    # for person in persons:
-    #     op.bulk_insert(documents, [{
-    #         'series': person.series_passport, 
-    #         'number': person.number_passport, 
-    #         'issue': person.date_given, 
-    #         'person_id': person.id
-    #         }])
+    op.create_table(
+        'documents',
+        sa.Column('id', sa.Integer, primary_key=True, 
+                  autoincrement=True, unique=True, nullable=False),
+        sa.Column('view', sa.String(255)),
+        sa.Column('series', sa.String(255)),
+        sa.Column('number', sa.String(255)),
+        sa.Column('agency', sa.Text()),
+        sa.Column('issue', sa.Date()),
+        sa.Column('person_id', sa.Integer()),
+        sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
+    )
+    documents = sa.Table('documents', op.get_bind())
+    for person in persons:
+        op.bulk_insert(documents, [{
+            'series': person.series_passport, 
+            'number': person.number_passport, 
+            'issue': person.date_given, 
+            'person_id': person.id
+            }])
     
-    # op.create_table(
-    #     'addresses',
-    #     sa.Column('id', sa.Integer, primary_key=True, 
-    #               autoincrement=True, unique=True, nullable=False),
-    #     sa.Column('view', sa.String(255)),
-    #     sa.Column('region', sa.String(255)),
-    #     sa.Column('address', sa.Text()),
-    #     sa.Column('person_id', sa.Integer()),
-    #     sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
-    # )
-    # addresses = sa.Table('addresses', op.get_bind())
-    # for person in persons:
-    #     op.bulk_insert(addresses, [
-    #         {'view': 'Адрес регистрации', 
-    #          'address': person.reg_address, 
-    #          'person_id': person.id},
-    #         {'view': 'Адрес проживания', 
-    #          'address': person.live_address, 
-    #          'person_id': person.id}
-    #     ])
+    op.create_table(
+        'addresses',
+        sa.Column('id', sa.Integer, primary_key=True, 
+                  autoincrement=True, unique=True, nullable=False),
+        sa.Column('view', sa.String(255)),
+        sa.Column('region', sa.String(255)),
+        sa.Column('address', sa.Text()),
+        sa.Column('person_id', sa.Integer()),
+        sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
+    )
+    addresses = sa.Table('addresses', op.get_bind())
+    for person in persons:
+        op.bulk_insert(addresses, [
+            {'view': 'Адрес регистрации', 
+             'address': person.reg_address, 
+             'person_id': person.id},
+            {'view': 'Адрес проживания', 
+             'address': person.live_address, 
+             'person_id': person.id}
+        ])
     
-    # op.create_table(
-    #     'contacts',
-    #     sa.Column('id', sa.Integer, primary_key=True, 
-    #               autoincrement=True, unique=True, nullable=False),
-    #     sa.Column('view', sa.String(255)),
-    #     sa.Column('contact', sa.String(255)),
-    #     sa.Column('person_id', sa.Integer()),
-    #     sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
-    # )
-    # contacts = sa.Table('contacts', op.get_bind())
-    # for person in persons:
-    #     op.bulk_insert(contacts, [
-    #         {'view': 'Номер телефона', 
-    #          'contact': person.phone, 
-    #          'person_id': person.id},
-    #         {'view': 'Электронная почта', 
-    #          'contact': person.email, 
-    #          'person_id': person.id}
-    #     ])
+    op.create_table(
+        'contacts',
+        sa.Column('id', sa.Integer, primary_key=True, 
+                  autoincrement=True, unique=True, nullable=False),
+        sa.Column('view', sa.String(255)),
+        sa.Column('contact', sa.String(255)),
+        sa.Column('person_id', sa.Integer()),
+        sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
+    )
+    contacts = sa.Table('contacts', op.get_bind())
+    for person in persons:
+        op.bulk_insert(contacts, [
+            {'view': 'Номер телефона', 
+             'contact': person.phone, 
+             'person_id': person.id},
+            {'view': 'Электронная почта', 
+             'contact': person.email, 
+             'person_id': person.id}
+        ])
     
     op.create_table(
         'workplaces',
@@ -273,28 +273,28 @@ def upgrade_db():
     
     op.drop_column('checks', 'resume')
 
-    # # migrate inquiries table
-    # op.drop_column('inquiries', 'staff')
-    # op.drop_column('inquiries', 'period')
-    # op.add_column('inquiries', sa.Column('source', sa.String(255)))
-    # with op.batch_alter_table('iqueries') as batch_op:
-    #     batch_op.add_column('inquiries', 
-    #                         sa.Column('officer', sa.String(255)))
-    #     batch_op.alter_column('firm', 
-    #                           new_column_name='initiator', 
-    #                           type_=sa.String(255), 
-    #                           existing_type=sa.Text())
-    #     batch_op.alter_column('date_inq', 
-    #                           new_column_name='deadline', 
-    #                           type_=sa.Date(), 
-    #                           existing_type=sa.Text())
-    #     batch_op.alter_column('iquery_id', new_column_name='person_id')
+    # migrate inquiries table
+    op.drop_column('inquiries', 'staff')
+    op.drop_column('inquiries', 'period')
+    op.add_column('inquiries', sa.Column('source', sa.String(255)))
+    with op.batch_alter_table('iqueries') as batch_op:
+        batch_op.add_column('inquiries', 
+                            sa.Column('officer', sa.String(255)))
+        batch_op.alter_column('firm', 
+                              new_column_name='initiator', 
+                              type_=sa.String(255), 
+                              existing_type=sa.Text())
+        batch_op.alter_column('date_inq', 
+                              new_column_name='deadline', 
+                              type_=sa.Date(), 
+                              existing_type=sa.Text())
+        batch_op.alter_column('iquery_id', new_column_name='person_id')
 
-    # # migrate registries table
-    # registries = sa.Table('registries', op.get_bind())
-    # for reg in registries:
-    #     person =persons.select().where(persons.c.id == reg.c.registry_id)
-    #     persons.update().where(persons.c.id == reg.c.registry_id).values(
-    #         path=reg.c.url,
-    #     )
-    # op.drop_table('registries')
+    # migrate registries table
+    registries = sa.Table('registries', op.get_bind())
+    for reg in registries:
+        person =persons.select().where(persons.c.id == reg.c.registry_id)
+        persons.update().where(persons.c.id == reg.c.registry_id).values(
+            path=reg.c.url,
+        )
+    op.drop_table('registries')
