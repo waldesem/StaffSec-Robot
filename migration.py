@@ -1,13 +1,14 @@
+from datetime import datetime
 from alembic import op
 import sqlalchemy as sa
 
 from models.classes import Categories, Conclusions, Regions, Statuses
+from models.schema import DocumentSchema, PersonSchema, StaffSchema, PathSchema, \
+    RegAddressSchema, LiveAddressSchema, PhoneContactSchema, EmailContactSchema
 
 
 def upgrade_db():
-
-    op.rename_table('candidates', 'persons')
-    op.rename_table('iqueries', 'inquiries')
+    conn = op.get_bind()
     
     categories = op.create_table(
         'categories',
@@ -50,17 +51,13 @@ def upgrade_db():
         sa.Column('person_id', sa.Integer()),
         sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
     )
+    res = conn.execute(sa.text(
+        "SELECT id, staff, department FROM persons"
+    ))
+    results = res.fetchall()
+    op.bulk_insert(staffs, StaffSchema().dump(results, many=True))
 
-    persons = sa.Table('persons', metadata)
-
-    for person in persons:
-        op.bulk_insert(staffs, [{
-            'position': person.staff, 
-            'department': person.department, 
-            'person_id': person.id
-            }])
-
-    op.create_table(
+    documents = op.create_table(
         'documents',
         sa.Column('id', sa.Integer, primary_key=True, 
                   autoincrement=True, unique=True, nullable=False),
@@ -72,16 +69,13 @@ def upgrade_db():
         sa.Column('person_id', sa.Integer()),
         sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
     )
-    documents = sa.Table('documents', op.get_bind())
-    for person in persons:
-        op.bulk_insert(documents, [{
-            'series': person.series_passport, 
-            'number': person.number_passport, 
-            'issue': person.date_given, 
-            'person_id': person.id
-            }])
+    res = conn.execute(sa.text(
+        "SELECT id, series_passport, number_passport, date_given FROM persons"
+    ))
+    results = res.fetchall()
+    op.bulk_insert(documents, DocumentSchema().dump(results, many=True))
     
-    op.create_table(
+    addresses = op.create_table(
         'addresses',
         sa.Column('id', sa.Integer, primary_key=True, 
                   autoincrement=True, unique=True, nullable=False),
@@ -91,18 +85,16 @@ def upgrade_db():
         sa.Column('person_id', sa.Integer()),
         sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
     )
-    addresses = sa.Table('addresses', op.get_bind())
-    for person in persons:
-        op.bulk_insert(addresses, [
-            {'view': 'Адрес регистрации', 
-             'address': person.reg_address, 
-             'person_id': person.id},
-            {'view': 'Адрес проживания', 
-             'address': person.live_address, 
-             'person_id': person.id}
-        ])
+    res_reg = conn.execute(sa.text(
+        "SELECT id, reg_address FROM persons"
+    ))
+    res_live = conn.execute(sa.text(
+        "SELECT id, live_address FROM persons"
+    ))
+    op.bulk_insert(addresses, RegAddressSchema().dump(res_reg.fetchall(), many=True) 
+                   + LiveAddressSchema().dump(res_live.fetchall(), many=True))
     
-    op.create_table(
+    contacts = op.create_table(
         'contacts',
         sa.Column('id', sa.Integer, primary_key=True, 
                   autoincrement=True, unique=True, nullable=False),
@@ -111,17 +103,15 @@ def upgrade_db():
         sa.Column('person_id', sa.Integer()),
         sa.ForeignKeyConstraint(('person_id',), ['persons.id'],),
     )
-    contacts = sa.Table('contacts', op.get_bind())
-    for person in persons:
-        op.bulk_insert(contacts, [
-            {'view': 'Номер телефона', 
-             'contact': person.phone, 
-             'person_id': person.id},
-            {'view': 'Электронная почта', 
-             'contact': person.email, 
-             'person_id': person.id}
-        ])
-    
+    res_phone = conn.execute(sa.text(
+        "SELECT id, phone FROM persons"
+    ))
+    res_mail = conn.execute(sa.text(
+        "SELECT id, email FROM persons"
+    ))
+    results = res.fetchall()
+    op.bulk_insert(contacts, PhoneContactSchema().dump(res_phone.fetchall(), many=True) 
+                   + EmailContactSchema().dump(res_mail.fetchall(), many=True))    
     op.create_table(
         'workplaces',
         sa.Column('id', sa.Integer, primary_key=True, 
@@ -176,63 +166,43 @@ def upgrade_db():
         sa.Column('adding', sa.String(255)),
         sa.Column('mobile', sa.String(255)),
         sa.Column('mail', sa.String(255)),
-        sa.Column('comment', sa.String(255)),
-        sa.Column('data', sa.String(255)),
+        sa.Column('comment', sa.Text()),
+        sa.Column('data', sa.Date()),
     )
 
-    # migrate persons table
-    with op.batch_alter_table('persons') as batch_op:
-        batch_op.alter_column('full_name', 
-                              new_column_name='fullname', 
-                              type_=sa.String(255), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('last_name', 
-                              new_column_name='previous', 
-                              type_=sa.String(255), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('birthday',type_=sa.Date(), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('birth_place', 
-                              new_column_name='birthplace', 
-                              type_=sa.String(255), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('country',
-                              type_=sa.String(255), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('snils',
-                              type_=sa.String(12), 
-                              existing_type=sa.Text())
-
-        batch_op.alter_column('inn',
-                              type_=sa.String(11), 
-                              existing_type=sa.Text())
-
-        batch_op.add_column(sa.Column('category_id', sa.Integer(), 
-                                      sa.ForeignKey('categories.id', 
-                                                    name='fk_persons_category_id')))
-        batch_op.add_column('persons', 
-                            sa.Column('region_id', sa.Integer(), 
-                                      sa.ForeignKey('regions.id',
-                                                    name='fk_persons_region_id')))
-        batch_op.add_column('persons', 
-                            sa.Column('status_id', sa.Integer(), 
-                                      sa.ForeignKey('statuses.id',
-                                                    name='fk_persons_status_id')))
-        batch_op.add_column('persons', 
-                            sa.Column('ext_country', sa.String(255)))
-        batch_op.add_column('persons', 
-                            sa.Column('marital', sa.String(255)))
-        batch_op.add_column('persons', 
-                            sa.Column('path', sa.Text()))
-        batch_op.add_column('persons', 
-                            sa.Column('create', sa.Date()))
-        batch_op.add_column('persons', 
-                            sa.Column('update', sa.Date()))
+    persons = op.create_table(
+        'persons',
+        sa.Column('id', sa.Integer, primary_key=True, 
+                  autoincrement=True, unique=True, nullable=False),
+        sa.Column('region_id', sa.Integer(), 
+                  sa.ForeignKey('regions.id',
+                                name='fk_persons_region_id')),
+        sa.Column('category_id', sa.Integer(), 
+                  sa.ForeignKey('categories.id',
+                                name='fk_persons_category_id')),
+        sa.Column('fullname', sa.String(255)),
+        sa.Column('previous', sa.Text()),
+        sa.Column('birthday', sa.Date()),
+        sa.Column('birthplace', sa.Text()),
+        sa.Column('country', sa.String()),
+        sa.Column('ext_country', sa.Text()),
+        sa.Column('snils', sa.String()),
+        sa.Column('inn', sa.String()),
+        sa.Column('education', sa.Text()),
+        sa.Column('marital', sa.String()),
+        sa.Column('addition', sa.Text()),
+        sa.Column('path', sa.Text()),
+        sa.Column('status_id', sa.Integer(), 
+                  sa.ForeignKey('statuses.id',
+                                name='fk_persons_status_id')),
+        sa.Column('create', sa.Date()),
+        sa.Column('update', sa.Date())
+    )
+    res = conn.execute(sa.text(
+        "SELECT id, full_name, last_name, birthday, birth_place, country, snils, inn, education FROM persons"
+    ))
+    results = res.fetchall()
+    op.bulk_insert(persons, PersonSchema().dump(results, many=True))
 
     # migrate check table
     with op.batch_alter_table('checks') as batch_op:
@@ -269,17 +239,16 @@ def upgrade_db():
         batch_op.add_column(sa.Column('comments', sa.Text()))
         batch_op.add_column(sa.Column('pfo', sa.Boolean()))
         batch_op.add_column(sa.Column('addition', sa.Text()))
-        batch_op.add_column(sa.Integer(), sa.ForeignKey('categories.id'))
-    
-    op.drop_column('checks', 'resume')
+        batch_op.add_column(sa.Column('conclusion_id', sa.Integer(), 
+                                      sa.ForeignKey('conclusions.id',
+                                                    name='fk_checks_conclusion_id')))
+        batch_op.drop_column('resume')
 
-    # migrate inquiries table
-    op.drop_column('inquiries', 'staff')
-    op.drop_column('inquiries', 'period')
-    op.add_column('inquiries', sa.Column('source', sa.String(255)))
-    with op.batch_alter_table('iqueries') as batch_op:
-        batch_op.add_column('inquiries', 
-                            sa.Column('officer', sa.String(255)))
+    ###
+    op.rename_table('iqueries', 'inquiries')
+    with op.batch_alter_table('inquiries') as batch_op:
+        batch_op.add_column(sa.Column('source', sa.String(255)))
+        batch_op.add_column(sa.Column('officer', sa.String(255)))
         batch_op.alter_column('firm', 
                               new_column_name='initiator', 
                               type_=sa.String(255), 
@@ -288,13 +257,20 @@ def upgrade_db():
                               new_column_name='deadline', 
                               type_=sa.Date(), 
                               existing_type=sa.Text())
-        batch_op.alter_column('iquery_id', new_column_name='person_id')
+        batch_op.alter_column('iquery_id', 
+                              new_column_name='person_id')
+        batch_op.drop_column('staff')
+        batch_op.drop_column('period')
 
     # migrate registries table
-    registries = sa.Table('registries', op.get_bind())
-    for reg in registries:
-        person =persons.select().where(persons.c.id == reg.c.registry_id)
-        persons.update().where(persons.c.id == reg.c.registry_id).values(
-            path=reg.c.url,
+    res = conn.execute(sa.text("select url, registry_id from registries"))
+    results = res.fetchall()
+    url_list = PathSchema().dump(results, many=True)
+    for item in url_list:
+        conn.execute(sa.text(
+            "update persons set path = '{}' where id = {}"\
+                .format(item['path'], item['registry_id']))
         )
+
     op.drop_table('registries')
+    op.drop_table('candidates')
