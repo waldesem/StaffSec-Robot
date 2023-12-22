@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, create_engine, ForeignKey, String, Text, Date, s
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from config import Config
-from ..models.classes import Conclusions
+from models.classes import Conclusions
 
 
 engine = create_engine(Config.DATABASE_URI, echo=True)
