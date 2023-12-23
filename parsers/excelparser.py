@@ -1,46 +1,56 @@
 from datetime import datetime
+import sqlite3
 import openpyxl
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from ..models.model import Conclusion, Person, Status, Category, Check, Robot, engine
-from ..models.classes import Categories, Statuses
+from config import Config
 
 
 def excel_to_db(path_files):  # take path's to conclusions
     for path in path_files:
         excel = ExcelFile(path)
         excel.person['resume'].update({
-            'category_id': Category().get_id(Categories.candidate.value),
-            'status_id': Status().get_id(Statuses.finish.value),
+            'category_id': 1,
+            'status_id': 9,
             'region_id': 1
             })
-        
-        with Session(engine) as sess:  # get personal dates
-            result = sess.execute(
-                select(Person)
-                .filter_by(fullname=excel.person['resume']['fullname'], 
-                           birthday=excel.person['resume']['birthday'])
-                ).scalar_one_or_none()
-            person_id = result.id
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
+                (excel.person['resume']['fullname'], excel.person['resume']['birthday'])
+            )
+            result = cursor.fetchone()
+            person_id = result[0] if result else None
 
-            if not result:
-                resume = Person(**excel.person['resume'])
-                sess.add(resume)
-                sess.flush()
-                person_id = resume.id
+            if not person_id:
+                cursor.execute(
+                    f"INSERT INTO persons ({','.join(excel.person['resume'].keys())}) "
+                    f"VALUES ({','.join(['?'] * len(excel.person['resume'].values()))})", 
+                    tuple(excel.person['resume'].values())
+                )
+                conn.commit()
+                person_id = cursor.lastrowid
             else:
-                for k, v in excel.person['resume'].items():
-                    if v:
-                        setattr(result, k, v)
+                cursor.execute(
+                    f"UPDATE persons SET {','.join(excel.person['resume'].keys())} "
+                    f"WHERE id = {person_id}",
+                    tuple(excel.person['resume'].values())
+                )
+                conn.commit()
 
             if excel.person['check']:
-                    sess.add(Check(**excel.person['check'] | {'person_id': person_id}))
+                cursor.execute(
+                    f"INSERT INTO checks ({','.join(excel.person['check'].keys())}, person_id) ",
+                    tuple(excel.person['check'].values()) + (person_id,)
+                )
+                conn.commit()
             elif excel.person['robot']:
-                sess.add(Robot(**excel.person['robot'] | {'person_id': person_id}))
-
-            sess.commit()
+                cursor.execute(
+                    f"INSERT INTO robots ({','.join(excel.person['robot'].keys())}, person_id) ",
+                    tuple(excel.person['robot'].values()) + (person_id,)
+                )
+                conn.commit()
 
 
 class ExcelFile:
@@ -94,6 +104,7 @@ class ExcelFile:
                                           )}
         return resumes
 
+    
     @staticmethod
     def get_check(sheet):
         checks = {
@@ -111,7 +122,7 @@ class ExcelFile:
             'pfo': True if sheet['C2^'].value in ['Назначено', 
                                                   'На испытательном сроке'] else False,
             'addition': sheet['C28'].value,
-            'conclusion': Conclusion().get_id(sheet['C23'].value),
+            'conclusion': ExcelFile.get_conclusion_id(sheet['C23'].value),
             'officer': sheet['C25'].value}
         return checks
 
@@ -127,3 +138,15 @@ class ExcelFile:
             'bki': sheet['B25'].value,
             }
         return robot
+
+    @staticmethod
+    def get_conclusion_id(name):
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM conclusions WHERE conclusion = ?",
+                (name, )
+            )
+            result = cursor.fetchone()
+        return result

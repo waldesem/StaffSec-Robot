@@ -1,41 +1,53 @@
 import re
 import json
+import sqlite3
 from datetime import datetime
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from ..models.model import Person, Region, Status, Category, Staff, Document, \
-    Address, Contact, Workplace, Affilation, engine
-from ..models.classes import Statuses, Categories
+from config import Config
 
 
 def json_to_db(json_path):
-    with Session(engine) as session:
-        for json_file in json_path:
-            json_data = JsonFile(json_file)
-            person = session.execute(
-            select(Person)
-            .filter(Person.fullname.ilike(json_data['fullname']),
-                    Person.birthday==json_data['birthday'])
-            ).one_or_none()
-            
-            if person:
-                for k, v in json_data.resume.items():
-                    setattr(person, k, v)
+    for json_file in json_path:
+        json_data = JsonFile(json_file)
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
+                (json_data.resume['fullname'], json_data.resume['birthday'])
+            )
+            result = cursor.fetchone()
+            person_id = result[0] if result else None
+        
+            if person_id:
+                cursor.execute(
+                    f"UPDATE persons SET {','.join(json_data.resume['resume'].keys())} "
+                    f"WHERE id = {person_id}",
+                    tuple(json_data.resume['resume'].values())
+                )
+                conn.commit()
             else:
-                person = Person(**json_data.resume)
-                session.add(person)
-                session.flush()
+                cursor.execute(
+                    f"INSERT INTO persons ({','.join(json_data.resume['resume'].keys())}) "
+                    f"VALUES ({','.join(['?'] * len(json_data.resume['resume'].values()))})", 
+                    tuple(json_data.resume['resume'].values())
+                )
+                conn.commit()
+                person_id = cursor.lastrowid
             
-            models = [Staff, Document, Address, Contact, Workplace, Affilation]
+            models = ['staffs', 'documents', 'addresses', 'contacts', 'workplaces', 'affilations']
             items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
                             json_data.contacts, json_data.workplaces, json_data.affilation]
+            
             for model, items in zip(models, items_lists):
                 for item in items:
                     if item:
-                        session.add(model(**item | {'person_id': person.id}))
-        session.commit()
+                        cursor.execute(
+                            f"INSERT INTO {model} ({','.join(item.keys())}, person_id) ",
+                            tuple(item.values()) + (person_id,)
+                        )
+                        conn.commit()
+
 
 class JsonFile:
     """ Create class for import data from json file"""
@@ -46,8 +58,8 @@ class JsonFile:
 
             self.resume = {
                 'region_id': self.parse_region(),
-                'category_id': Category().get_id(Categories.candidate.value),
-                'status_id': Status().get_id(Statuses.finish.value),
+                'category_id': self.get_category_id("Кандидат"),
+                'status_id': self.get_status_id("Окончено"),
                 'fullname': self.parse_fullname(),
                 'previous': self.parse_previous(),
                 'birthday': self.parse_birthday(),
@@ -101,11 +113,44 @@ class JsonFile:
             ]
             self.affilation = self.parse_affilation()
     
+    def get_category_id(self, name):
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM categories WHERE name = ?",
+                (name, )
+            )
+            result = cursor.fetchone()
+            return result[0] if result else 1
+    
+    def get_status_id(self, name):
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM statuses WHERE name = ?",
+                (name, )
+            )
+            result = cursor.fetchone()
+            return result[0] if result else 1
+        
+    def get_region_id(self, name):
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM regions WHERE region = ?",
+                (name, )
+            )
+            result = cursor.fetchone()
+            return result[0] if result else 1
+
     def parse_region(self):
         if 'department' in self.json_dict:
             divisions = re.split(r'/', self.json_dict['department'].strip())
             for div in divisions:
-                region_id = Region().get_id(div)
+                region_id = self.get_region_id(div)
                 if region_id:
                     return region_id
                 else:

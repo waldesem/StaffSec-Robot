@@ -1,13 +1,11 @@
 import os
 import shutil
 from datetime import datetime, date
+import sqlite3
 
 import openpyxl
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from config import Config
-from models.model import engine,Person, Inquiry, Check
 from parsers.excelparser import excel_to_db
 from parsers.jsonparser import json_to_db
 
@@ -99,22 +97,22 @@ def screen_iquiry_data(sheet, num_row):
                              strip(), '%d.%m.%Y'), '%Y-%m-%d'),
                  'fullname': sheet['A' + str(num)].value,
                  'birthday': sheet['B' + str(num)].value}
-        with Session(engine) as sess:
-            person = sess.execute(
-                select(Person)
-                .filter_by(fullname=chart['fullname'], 
-                           birthday=chart['birthday'])
-                ).scalar_one_or_none()
-            if not person:
-                person = Person(Person(fullname=chart['fullname'],
-                                birthday=chart['birthday']))
-                sess.add(person)
-                sess.flush()
-            sess.add(Inquiry(info = chart['info'],
-                                initiator = chart['initiator'],
-                                deadline = chart['deadline'],
-                                person_id = person.id))
-            sess.commit()
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            person = cursor.execute(
+                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?", 
+                (chart['fullname'], chart['birthday'])
+            )
+            result = person.fetchone()
+            if not result:
+                cursor.execute("INSERT INTO persons (fullname, birthday) \
+                                VALUES (?, ?)", (chart['fullname'], chart['birthday']))
+                conn.commit()
+            cursor.execute("INSERT INTO inquiries (info, initiator, deadline, person_id) \
+                            VALUES (?, ?, ?, ?, ?)", 
+                            (chart['info'], chart['initiator'], chart['deadline'], result[0]))
+            conn.commit()
 
 
 def screen_registry_data(sheet, num_row):
@@ -125,22 +123,22 @@ def screen_registry_data(sheet, num_row):
                  'deadline': datetime.strftime(datetime.strptime(str(sheet[f'K{num}'].value).\
                              strip(), '%d.%m.%Y'), '%Y-%m-%d'),
                  'url': sheet[f'L{num}'].value}
-        with Session(engine) as sess:
-            person = sess.execute(
-                select(Person)
-                .filter_by(fullname=chart['fullname'], 
-                           birthday=chart['birthday'])
-                ).scalar_one_or_none()
-            if not person:
-                person = Person(Person(fullname=chart['fullname'],
-                                birthday=chart['birthday']))
-                sess.add(person)
-                sess.flush()
-            sess.add(Check(decision = chart['decision'],
-                           deadline = chart['deadline'],
-                           url = chart['url'],
-                           person_id = person.id))
-            sess.commit()
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            person = cursor.execute(
+                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?", 
+                (chart['fullname'], chart['birthday'])
+            )
+            result = person.fetchone()
+            if not result:
+                cursor.execute("INSERT INTO persons (fullname, birthday) \
+                                VALUES (?, ?)", (chart['fullname'], chart['birthday']))
+                conn.commit()
+            cursor.execute("INSERT INTO registry (decision, deadline, url, person_id) \
+                            VALUES (?, ?, ?, ?)", 
+                            (chart['decision'], chart['deadline'], chart['url'], result[0]))
+            conn.commit()
 
 
 if __name__ == "__main__":
