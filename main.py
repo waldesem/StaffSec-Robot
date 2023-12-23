@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime, date
 import sqlite3
 
-import openpyxl
+from openpyxl import load_workbook
 
 from config import Config
 from parsers.excelparser import excel_to_db
@@ -24,7 +24,7 @@ def main():
 
 
 def parse_main():
-    wb = openpyxl.load_workbook(Config.MAIN_FILE, keep_vba=True, read_only=False)
+    wb = load_workbook(Config.MAIN_FILE, keep_vba=True, read_only=False)
     ws = wb.worksheets[0]
     num_row = range_row(ws['K5000':'K25000'])
 
@@ -69,7 +69,7 @@ def parse_main():
 
 
 def parse_info():
-    wb = openpyxl.load_workbook(Config.INFO_FILE, keep_vba=True, read_only=False)
+    wb = load_workbook(Config.INFO_FILE, keep_vba=True, read_only=False)
     ws = wb.worksheets[0]
     num_row = range_row(ws['G1':'G3000'])
     if len(num_row):
@@ -108,7 +108,7 @@ def screen_iquiry_data(sheet, num_row):
             if not result:
                 cursor.execute("INSERT INTO persons (fullname, birthday) \
                                 VALUES (?, ?)", (chart['fullname'], chart['birthday']))
-                conn.commit()
+
             cursor.execute("INSERT INTO inquiries (info, initiator, deadline, person_id) \
                             VALUES (?, ?, ?, ?, ?)", 
                             (chart['info'], chart['initiator'], chart['deadline'], result[0]))
@@ -134,7 +134,7 @@ def screen_registry_data(sheet, num_row):
             if not result:
                 cursor.execute("INSERT INTO persons (fullname, birthday) \
                                 VALUES (?, ?)", (chart['fullname'], chart['birthday']))
-                conn.commit()
+
             cursor.execute("INSERT INTO registry (decision, deadline, url, person_id) \
                             VALUES (?, ?, ?, ?)", 
                             (chart['decision'], chart['deadline'], chart['url'], result[0]))

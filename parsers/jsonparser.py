@@ -1,4 +1,3 @@
-import re
 import json
 import sqlite3
 from datetime import datetime
@@ -25,14 +24,12 @@ def json_to_db(json_path):
                     f"WHERE id = {person_id}",
                     tuple(json_data.resume['resume'].values())
                 )
-                conn.commit()
             else:
                 cursor.execute(
                     f"INSERT INTO persons ({','.join(json_data.resume['resume'].keys())}) "
                     f"VALUES ({','.join(['?'] * len(json_data.resume['resume'].values()))})", 
                     tuple(json_data.resume['resume'].values())
                 )
-                conn.commit()
                 person_id = cursor.lastrowid
             
             models = ['staffs', 'documents', 'addresses', 'contacts', 'workplaces', 'affilations']
@@ -46,7 +43,7 @@ def json_to_db(json_path):
                             f"INSERT INTO {model} ({','.join(item.keys())}, person_id) ",
                             tuple(item.values()) + (person_id,)
                         )
-                        conn.commit()
+            conn.commit()
 
 
 class JsonFile:
@@ -144,18 +141,18 @@ class JsonFile:
                 (name, )
             )
             result = cursor.fetchone()
-            return result[0] if result else 1
+            return result[0]
 
     def parse_region(self):
         if 'department' in self.json_dict:
-            divisions = re.split(r'/', self.json_dict['department'].strip())
+            region_id = 1
+            divisions = self.json_dict['department'].split('/')
             for div in divisions:
-                region_id = self.get_region_id(div)
-                if region_id:
-                    return region_id
-                else:
-                    return 1
-    
+                region = self.get_region_id(div)
+                if region:
+                    region_id = region
+            return region_id
+
     def parse_fullname(self):
         lastName = self.json_dict.get('lastName').strip()
         firstName = self.json_dict.get('firstName').strip()

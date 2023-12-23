@@ -1,6 +1,7 @@
-from datetime import datetime
 import sqlite3
-import openpyxl
+from datetime import datetime
+
+from openpyxl import load_workbook
 
 from config import Config
 
@@ -29,7 +30,6 @@ def excel_to_db(path_files):  # take path's to conclusions
                     f"VALUES ({','.join(['?'] * len(excel.person['resume'].values()))})", 
                     tuple(excel.person['resume'].values())
                 )
-                conn.commit()
                 person_id = cursor.lastrowid
             else:
                 cursor.execute(
@@ -37,20 +37,18 @@ def excel_to_db(path_files):  # take path's to conclusions
                     f"WHERE id = {person_id}",
                     tuple(excel.person['resume'].values())
                 )
-                conn.commit()
 
             if excel.person['check']:
                 cursor.execute(
                     f"INSERT INTO checks ({','.join(excel.person['check'].keys())}, person_id) ",
                     tuple(excel.person['check'].values()) + (person_id,)
                 )
-                conn.commit()
             elif excel.person['robot']:
                 cursor.execute(
                     f"INSERT INTO robots ({','.join(excel.person['robot'].keys())}, person_id) ",
                     tuple(excel.person['robot'].values()) + (person_id,)
                 )
-                conn.commit()
+            conn.commit()
 
 
 class ExcelFile:
@@ -60,7 +58,7 @@ class ExcelFile:
         self.screen_excel(path)
         
     def screen_excel(self, path):
-        workbook = openpyxl.load_workbook(path, keep_vba=True)
+        workbook = load_workbook(path, keep_vba=True)
         worksheet = workbook.worksheets[0]
         if path.startswith("Заключение"):
             if len(workbook.sheetnames) > 1:
