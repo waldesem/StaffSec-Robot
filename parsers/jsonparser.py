@@ -115,7 +115,7 @@ class JsonFile:
         with connection as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM categories WHERE name = ?",
+                "SELECT * FROM categories WHERE category = ?",
                 (name, )
             )
             result = cursor.fetchone()
@@ -126,7 +126,7 @@ class JsonFile:
         with connection as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM statuses WHERE name = ?",
+                "SELECT * FROM statuses WHERE status = ?",
                 (name, )
             )
             result = cursor.fetchone()

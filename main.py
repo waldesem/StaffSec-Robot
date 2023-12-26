@@ -91,12 +91,14 @@ def range_row(sheet):
         
 def screen_iquiry_data(sheet, num_row): 
     for num in num_row:
-        chart = {'info': sheet[f'E{num}'].value,
-                 'initiator': sheet[f'F{num}'].value,
-                 'deadline': datetime.strftime(datetime.strptime(str(sheet[f'G{num}'].value).\
-                             strip(), '%d.%m.%Y'), '%Y-%m-%d'),
-                 'fullname': sheet['A' + str(num)].value,
-                 'birthday': sheet['B' + str(num)].value}
+        chart = {
+            'info': sheet[f'E{num}'].value,
+            'initiator': sheet[f'F{num}'].value,
+            'deadline': datetime.strftime(datetime.strptime(str(sheet[f'G{num}'].value).
+                                                            strip(), '%d.%m.%Y'), '%Y-%m-%d'),
+            'fullname': sheet['A' + str(num)].value,
+            'birthday': datetime.strftime(datetime.strptime(str(sheet[f'B{num}'].value).
+                                                            strip(), '%d.%m.%Y'), '%Y-%m-%d')}
         connection = sqlite3.connect(Config.DATABASE_URI)
         with connection as conn:
             cursor = conn.cursor()
@@ -132,14 +134,28 @@ def screen_registry_data(sheet, num_row):
             )
             result = person.fetchone()
             if not result:
-                cursor.execute("INSERT INTO persons (fullname, birthday) \
-                                VALUES (?, ?)", (chart['fullname'], chart['birthday']))
+                cursor.execute("INSERT INTO persons (fullname, birthday, path)", 
+                               (chart['fullname'], chart['birthday'], chart['url']))
 
-            cursor.execute("INSERT INTO registry (decision, deadline, url, person_id) \
-                            VALUES (?, ?, ?, ?)", 
-                            (chart['decision'], chart['deadline'], chart['url'], result[0]))
+                cursor.execute(f"UPDATE checks SET conclusion_id = ?, deadline = ?, person_id = ?)", 
+                               (get_conclusion_id(chart['decision']), 
+                                chart['deadline'], cursor.lastrowid))
+            else:
+                cursor.execute("UPDATE persons SET path = ? WHERE id = ?", 
+                               (chart['url'], result[0]))
             conn.commit()
 
+def get_conclusion_id(name):
+        connection = sqlite3.connect(Config.DATABASE_URI)
+        with connection as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM conclusions WHERE LOWER conclusion = ?",
+                (name.lower(), )
+            )
+            result = cursor.fetchone()
+            return result[0] if result else 1
+        
 
 if __name__ == "__main__":
     main()
