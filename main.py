@@ -26,7 +26,7 @@ def main():
 def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True, read_only=False)
     ws = wb.worksheets[0]
-    num_row = range_row(ws['K5000':'K25000'])
+    num_row = range_row(ws['K'])
 
     if len(num_row):
         # list of directories with candidates names
@@ -35,11 +35,11 @@ def parse_main():
 
         if len(subdir):
             # получаем список путей к файлам Заключений
-            excel_path = list(filter(None, []))
-            json_path = list(filter(None, []))
+            excel_path = []
+            json_path = []
 
-            for f in subdir:
-                subdir_path = os.path.join(Config.WORK_DIR[0:-1], f)
+            for sub in subdir:
+                subdir_path = os.path.join(Config.WORK_DIR, sub)
                 for file in os.listdir(subdir_path):
                     if (file.startswith("Заключение") or file.startswith("Результаты")) \
                         and (file.endswith("xlsm") or file.endswith("xlsx")):
@@ -71,7 +71,7 @@ def parse_main():
 def parse_info():
     wb = load_workbook(Config.INFO_FILE, keep_vba=True, read_only=False)
     ws = wb.worksheets[0]
-    num_row = range_row(ws['G1':'G3000'])
+    num_row = range_row(ws['G'])
     if len(num_row):
         screen_iquiry_data(ws, num_row)
     wb.close()
@@ -81,11 +81,9 @@ def range_row(sheet):
     row_num = []
     for cell in sheet:
         for c in cell:
-            if isinstance(c.value, datetime):  # check format of date
-                if c.value.strftime('%Y-%m-%d') == date.today().strftime('%Y-%m-%d'):
+            if c.value:
+                if isinstance(c.value, datetime) and (c.value).date() == date.today():
                     row_num.append(c.row)
-            elif str(c.value).strip() == date.today().strftime('%d.%m.%Y'):
-                row_num.append(c.row)
     return row_num
 
         
@@ -94,11 +92,12 @@ def screen_iquiry_data(sheet, num_row):
         chart = {
             'info': sheet[f'E{num}'].value,
             'initiator': sheet[f'F{num}'].value,
-            'deadline': datetime.strftime(datetime.strptime(str(sheet[f'G{num}'].value).
-                                                            strip(), '%d.%m.%Y'), '%Y-%m-%d'),
-            'fullname': sheet['A' + str(num)].value,
-            'birthday': datetime.strftime(datetime.strptime(str(sheet[f'B{num}'].value).
-                                                            strip(), '%d.%m.%Y'), '%Y-%m-%d')}
+            'fullname': sheet[f'A{num}'].value,
+            'deadline': date.today(),
+            'birthday': (sheet[f'B{num}'].value).date() \
+                if isinstance((sheet[f'B{num}'].value).date(), datetime) \
+                    else date.today()
+            }
         connection = sqlite3.connect(Config.DATABASE_URI)
         with connection as conn:
             cursor = conn.cursor()
@@ -108,22 +107,26 @@ def screen_iquiry_data(sheet, num_row):
             )
             result = person.fetchone()
             if not result:
-                cursor.execute("INSERT INTO persons (fullname, birthday) \
-                                VALUES (?, ?)", (chart['fullname'], chart['birthday']))
-
+                cursor.execute("INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) \
+                                VALUES (?, ?)", (chart['fullname'], chart['birthday'],
+                                                 chart['deadline']), 1, 1, 9)
+            else:
+                cursor.execute("UPDATE persons SET update = ? WHERE id = ?", 
+                               date.today(), result[0])
             cursor.execute("INSERT INTO inquiries (info, initiator, deadline, person_id) \
-                            VALUES (?, ?, ?, ?, ?)", 
-                            (chart['info'], chart['initiator'], chart['deadline'], result[0]))
+                            VALUES (?, ?, ?, ?)", 
+                            (chart['info'], chart['initiator'], date.today(), result[0]))
             conn.commit()
 
 
 def screen_registry_data(sheet, num_row):
     for num in num_row:
         chart = {'fullname': sheet['A' + str(num)].value,
-                 'birthday': sheet['B' + str(num)].value,
+                 'birthday': (sheet['B' + str(num)].value).date() \
+                    if isinstance(sheet['B' + str(num)].value, datetime)
+                        else date.today(),
                  'decision': sheet[f'J{num}'].value,
-                 'deadline': datetime.strftime(datetime.strptime(str(sheet[f'K{num}'].value).\
-                             strip(), '%d.%m.%Y'), '%Y-%m-%d'),
+                 'deadline': date.today(),
                  'url': sheet[f'L{num}'].value}
         connection = sqlite3.connect(Config.DATABASE_URI)
         with connection as conn:

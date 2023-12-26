@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 from openpyxl import load_workbook
 
@@ -64,42 +64,45 @@ class ExcelFile:
             if len(workbook.sheetnames) > 1:
                 sheet = workbook.worksheets[1]
                 if str(sheet['K1'].value) == 'ФИО':
-                    self.person.append(dict(resume = self.get_resume(sheet)))
+                    self.person.append({'resume': self.get_resume(sheet)})
             else:
-                self.person.append(dict(resume = self.get_conclusion_resume(worksheet)))
-            self.person.append(dict(check = self.get_check(worksheet)))
+                self.person.append({'resume': self.get_conclusion_resume(worksheet)})
+            self.person.append({'check': self.get_check(worksheet)})
         else:
-            self.person.append(dict(robot = self.get_robot(worksheet)))
-            self.person.append(dict(robot = self.get_robot(worksheet)))
+            self.person.append({'robot': self.get_robot(worksheet)})
 
         workbook.close()
 
     @staticmethod
     def get_resume(sheet):
-        resume = dict(fullname=str(sheet['K3'].value).title().strip(),
-                        birthday=datetime.strftime(
-                            datetime.strptime(str(sheet['L3'].value).strip(), 
-                                              '%d.%m.%Y'), '%Y-%m-%d'
-                                              ),
-                        birthplace=str(sheet['M3'].value).strip(),
-                        country=str(sheet['T3'].value).strip(),
-                        snils=str(sheet['U3'].value).strip(),
-                        inn=str(sheet['V3'].value).strip())
+        resume = {
+            'fullname': str(sheet['K3'].value).title().strip(),
+            'birthday': (sheet['L3'].value).date() \
+                if isinstance(sheet['L3'].value, datetime) \
+                    else date.today(),
+            'birthplace': str(sheet['M3'].value).strip(),
+            'country': str(sheet['T3'].value).strip(),
+            'snils': str(sheet['U3'].value).strip(),
+            'inn': str(sheet['V3'].value).strip()
+            }
         return resume
 
     @staticmethod
     def get_conclusion_resume(sheet):
-        resumes = {'fullname': sheet['C6'].value,
-                    'birthday': sheet['C8'].value}
+        resumes = {
+            'fullname': sheet['C6'].value,
+            'birthday': (sheet['C8'].value).date() \
+                if isinstance(sheet['L3'].value, datetime) \
+                    else date.today()
+                    }
         return resumes
     
     @staticmethod
     def get_robot_resume(sheet):
         resumes = {'fullname': sheet['B4'].value,
-                    'birthday': datetime.strftime(
-                        datetime.strptime(str(sheet['B5'].value).strip(), 
-                                          '%d.%m.%Y'), '%Y-%m-%d'
-                                          )}
+                    'birthday': (sheet['L3'].value).date() \
+                            if isinstance(sheet['L3'].value, datetime) \
+                                else date.today()}
         return resumes
 
     
@@ -117,8 +120,7 @@ class ExcelFile:
             'bki': sheet['C20'].value,
             'affiliation': sheet['C21'].value,
             'internet': sheet['C22'].value,
-            'pfo': True if sheet['C2^'].value in ['Назначено', 
-                                                  'На испытательном сроке'] else False,
+            'pfo': True if sheet['C2^'].value else False,
             'addition': sheet['C28'].value,
             'conclusion': ExcelFile.get_conclusion_id(sheet['C23'].value),
             'officer': sheet['C25'].value}
