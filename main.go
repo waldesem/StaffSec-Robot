@@ -24,14 +24,16 @@ func main () {
     }
     if time.Now().Truncate(24 * time.Hour).Equal(mainFileDate) {
         os.Rename(ConfigInstance.MainFile, ConfigInstance.ArchiveDir)
-        parse_info()
+        parseInfoFile()
     }
 }
 
 func parseMainFile () {
     wb := excelize.OpenFile(ConfigInstance.MainFile)
-    ws := wb.GetSheetName(0)
-    num_row := getRows(ws)
+}
+
+func parseInfoFile () {
+    wb := excelize.OpenFile(ConfigInstance.InfoFile)
 }
 
 func getRows(ws string) []int {
