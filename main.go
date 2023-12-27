@@ -1,27 +1,42 @@
-import os
-import shutil
-from datetime import datetime, date
-import sqlite3
+package main
 
-from openpyxl import load_workbook
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
+    "time"
+)
 
-from config import Config
-from parsers.excelparser import excel_to_db
-from parsers.jsonparser import json_to_db
+import (
+   "github.com/360EntSecGroup-Skylar/excelize"
+)
 
+func main () {
+    mainFileDate := time.Unix(os.Stat(ConfigInstance.MainFile).ModTime().Unix(), 0)
+    infoFileDate := time.Unix(os.Stat(ConfigInstance.InfoFile).ModTime().Unix(), 0)
+    if time.Now().Truncate(24 * time.Hour).Equal(mainFileDate) || time.Now().Truncate(24 * time.Hour).Equal(infoFileDate) {
+        os.Rename(ConfigInstance.DatabaseURI, ConfigInstance.ArchiveDir)
+    }
+    if time.Now().Truncate(24 * time.Hour).Equal(infoFileDate) {
+        os.Rename(ConfigInstance.InfoFile, ConfigInstance.ArchiveDir)
+        parseMainFile()
+    }
+    if time.Now().Truncate(24 * time.Hour).Equal(mainFileDate) {
+        os.Rename(ConfigInstance.MainFile, ConfigInstance.ArchiveDir)
+        parse_info()
+    }
+}
 
-def main():
-    main_file_date = date.fromtimestamp(os.path.getmtime(Config.MAIN_FILE))
-    info_file_date = date.fromtimestamp(os.path.getmtime(Config.INFO_FILE))
-    if date.today() in [main_file_date, info_file_date]:
-        shutil.copy(Config.DATABASE_URI, Config.ARCHIVE_DIR)
-    if date.today() == info_file_date:
-        shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR)
-        parse_main()
-    if date.today() == main_file_date:
-        shutil.copy(Config.MAIN_FILE, Config.ARCHIVE_DIR)
-        parse_info()        
+func parseMainFile () {
+    wb := excelize.OpenFile(ConfigInstance.MainFile)
+    ws := wb.GetSheetName(0)
+    num_row := getRows(ws)
+}
 
+func getRows(ws string) []int {
+    
+}
 
 def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True, read_only=False)
