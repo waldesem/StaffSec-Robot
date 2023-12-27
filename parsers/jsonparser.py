@@ -59,13 +59,14 @@ class JsonFile:
                 'status_id': self.get_status_id("Окончено"),
                 'fullname': self.parse_fullname(),
                 'previous': self.parse_previous(),
-                'birthday': self.parse_birthday(),
-                'birthplace': self.json_dict.get('birthplace', '').strip(),
-                'country': self.json_dict.get('citizen' '').strip(),
-                'ext_country': self.json_dict.get('additionalCitizenship', '').strip(),
-                'snils': self.json_dict.get('snils', '').strip(),
-                'inn': self.json_dict.get('inn', '').strip(),
-                'marital': self.json_dict.get('maritalStatus', '').strip(),
+                'birthday': datetime.strptime(self.json_dict.get('birthday', '1900-01-01'), 
+                                              '%Y-%m-%d'),
+                'birthplace': self.json_dict.get('birthplace', ''),
+                'country': self.json_dict.get('citizen' ''),
+                'ext_country': self.json_dict.get('additionalCitizenship', ''),
+                'snils': self.json_dict.get('snils', ''),
+                'inn': self.json_dict.get('inn', ''),
+                'marital': self.json_dict.get('maritalStatus', ''),
                 'education': self.parse_education()
             }
             
@@ -74,38 +75,38 @@ class JsonFile:
             self.passport = [
                 {
                     'view': 'Паспорт',
-                    'series': self.json_dict.get('passportSerial', '').strip(),
-                    'number': self.json_dict.get('passportNumber', '').strip(),
+                    'series': self.json_dict.get('passportSerial', ''),
+                    'number': self.json_dict.get('passportNumber', ''),
                     'issue': datetime.strptime(
                         self.json_dict.get('passportIssueDate', '1900-01-01'), '%Y-%m-%d'
                         ),
-                    'agency': self.json_dict.get('passportIssuedBy', '').strip(),
+                    'agency': self.json_dict.get('passportIssuedBy', ''),
                 }
             ]
             self.addresses = [
                 {
                     'view': "Адрес регистрации", 
-                    'address': self.json_dict.get('regAddress', '').strip(),
+                    'address': self.json_dict.get('regAddress', ''),
                 },
                 {
                     'view': "Адрес проживания", 
-                    'address': self.json_dict.get('validAddress', '').strip(),
+                    'address': self.json_dict.get('validAddress', ''),
                 }
             ]
             self.contacts = [
                 {
                     'view': 'Мобильный телефон', 
-                    'contact': self.json_dict.get('contactPhone', '').strip(),
+                    'contact': self.json_dict.get('contactPhone', ''),
                 },
                 {
                     'view': 'Электронная почта', 
-                    'contact': self.json_dict.get('email', '').strip(),
+                    'contact': self.json_dict.get('email', ''),
                 }
             ]
             self.staff = [
                 {
-                    'position': self.json_dict.get('positionName', '').strip(),
-                    'department': self.json_dict.get('department', '').strip()
+                    'position': self.json_dict.get('positionName', ''),
+                    'department': self.json_dict.get('department', '')
                 }
             ]
             self.affilation = self.parse_affilation()
@@ -154,25 +155,21 @@ class JsonFile:
             return region_id
 
     def parse_fullname(self):
-        lastName = self.json_dict.get('lastName').strip()
-        firstName = self.json_dict.get('firstName').strip()
-        midName = self.json_dict.get('midName', '').strip()
+        lastName = self.json_dict.get('lastName')
+        firstName = self.json_dict.get('firstName')
+        midName = self.json_dict.get('midName', '')
         return f"{lastName} {firstName} {midName}".rstrip()
     
-    def parse_birthday(self):
-        birthday = datetime.strptime(self.json_dict.get('birthday', '1900-01-01'), '%Y-%m-%d')
-        return birthday
-
     def parse_previous(self):
         if 'hasNameChanged' in self.json_dict:
             if len(self.json_dict['nameWasChanged']):
                 previous = []
                 for item in self.json_dict['nameWasChanged']:
-                    firstNameBeforeChange = item.get('firstNameBeforeChange', '').strip()
-                    lastNameBeforeChange = item.get('lastNameBeforeChange', '').strip()
-                    midNameBeforeChange = item.get('midNameBeforeChange', '').strip()
-                    yearOfChange = str(item.get('yearOfChange', '')).strip()
-                    reason = str(item.get('reason', '')).strip()
+                    firstNameBeforeChange = item.get('firstNameBeforeChange', '')
+                    lastNameBeforeChange = item.get('lastNameBeforeChange', '')
+                    midNameBeforeChange = item.get('midNameBeforeChange', '')
+                    yearOfChange = str(item.get('yearOfChange', ''))
+                    reason = str(item.get('reason', ''))
                     previous.append(f"{yearOfChange} - {firstNameBeforeChange} "
                                     f"{lastNameBeforeChange} {midNameBeforeChange}, "
                                     f"{reason}".replace("  ", ""))
@@ -184,9 +181,9 @@ class JsonFile:
             if len(self.json_dict['education']):
                 education = []
                 for item in self.json_dict['education']:
-                    institutionName = item.get('institutionName').strip()
+                    institutionName = item.get('institutionName')
                     endYear = item.get('endYear', 'н.в.')
-                    specialty = item.get('specialty').strip()
+                    specialty = item.get('specialty')
                     education.append(f"{str(endYear)} - {institutionName}, "
                                      f"{specialty}".replace("  ", ""))
                 return '; '.join(education)
@@ -201,10 +198,10 @@ class JsonFile:
                         'start_date': datetime.strptime(item.get('beginDate', '1900-01-01'), '%Y-%m-%d'),
                         'end_date': datetime.strptime(item['endDate'], '%Y-%m-%d') \
                             if 'endDate' in item else datetime.now(),
-                        'workplace': item.get('name', '').strip(),
-                        'address': item.get('address', '').strip(),
-                        'position': item.get('position', '').strip(),
-                        'reason': item.get('fireReason', '').strip()
+                        'workplace': item.get('name', ''),
+                        'address': item.get('address', ''),
+                        'position': item.get('position', ''),
+                        'reason': item.get('fireReason', '')
                     }
                     experience.append(work)
                 return experience

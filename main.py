@@ -13,7 +13,7 @@ from parsers.jsonparser import json_to_db
 def main():
     main_file_date = date.fromtimestamp(os.path.getmtime(Config.MAIN_FILE))
     info_file_date = date.fromtimestamp(os.path.getmtime(Config.INFO_FILE))
-    if date.today() == main_file_date or date.today() == info_file_date:
+    if date.today() in [main_file_date, info_file_date]:
         shutil.copy(Config.DATABASE_URI, Config.ARCHIVE_DIR)
     if date.today() == info_file_date:
         shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR)
