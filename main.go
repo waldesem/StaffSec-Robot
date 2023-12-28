@@ -5,12 +5,23 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+    "strings"
+    "database/sql"
 )
 
 import (
     "github.com/xuri/excelize/v2"
     "github.com/mattn/go-sqlite3"
 )
+
+type infoFile struct {
+    id int
+    info string
+    initiator string
+    fullname string
+    birthday time.Time
+    deadline time.Time
+}
 
 var basePath string = filepath.Join(currentPath(), "..")
 var workDir string = filepath.Join(basePath, "Кандидаты")
@@ -41,8 +52,8 @@ func main() {
 		fmt.Println(err)
 	}
 
-	workFileDate := workFileStat.ModTime()
-	infoFileDate := infoFileStat.ModTime().Unix()
+	workFileDate := workFileStat.ModTime().Truncate(24 * time.Hour)
+	infoFileDate := infoFileStat.ModTime().Truncate(24 * time.Hour)
     
 	if time.Now().Truncate(24 * time.Hour).Equal(workFileDate) || time.Now().Truncate(24 * time.Hour).Equal(infoFileDate) {
 		os.Rename(databaseURI, filepath.Join(archiveDir, database))
@@ -57,94 +68,144 @@ func main() {
 	}
 }
 
-func getRows(col []int) []int {
-    var rowNum []int
-    for _, cell := range col {
-        for _, c := range cell {
-            if c == nil {
-                continue
-            } else if c.(*excelize.Cell).Type == time.Time || c.Truncate(24*time.Hour) == time.Now().Truncate(24*time.Hour) {
-                rowNum = append(rowNum, c.row)
-            }
-        }
-    }
-    return rowNum
+func getNums(fileName, colName  string) []int {
+	f, err := excelize.OpenFile(fileName)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	totalRows, _ := f.GetRows("Лист1")
+	var numRows []int
+	for i := 1; i < len(totalRows); i++ {
+		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", colName, i))
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+		if cell != "" {
+			t, err := time.Parse("02/01/2006", cell)
+			if err != nil {
+				fmt.Println(err)
+				return nil
+			}
+			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
+				numRows = append(numRows, i)
+			}
+		}
+	}
+	return numRows
 }
 
 func parseInfoFile() {
-    f, err := excelize.OpenFile(infoFile)
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
-    defer func() {
-        if err := f.Close(); err != nil {
-            fmt.Println(err)
-        }
-    }()
-    ws, err := f.GetwsInfo("Лист1")
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
-    numRow := getRows(ws["G"])
-    if len(numRow) == 0 {
-        return
-    }
-    for _, num := range numRow {
-        chart := map[string]interface{}{
-            "info": ws["E" + str(num)].value,
-            "initiator": ws["F" + str(num)].value,
-            "fullname": ws["A" + str(num)].value,
-            "deadline": time.Now().Truncate(24 * time.Hour),
-            "birthday": ws["B" + str(num)].Truncate(24 * time.Hour
-            }
-        db, err := sqlite3.Open(databaseURI)
+    numRow := getNums(workPath, "G")
+
+    if len(numRow) > 0 {
+        f, err := excelize.OpenFile(mainFile)
         if err != nil {
             fmt.Println(err)
             return
         }
         defer func() {
-            if err := db.Close(); err != nil {
+            if err := f.Close(); err != nil {
                 fmt.Println(err)
             }
-        }
-        rows, err := db.Query("SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-                (chart["fullname"], chart["birthday"])
+        }()
+
+        for _, num := range numRow {
+            info, _ := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
+            initiator, _ := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
+            fullname, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+            birth, _ := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
+            day, _ := time.Parse("02/01/2006", birth)
+            birthday := day.Local()
+            deadline := time.Now().Truncate(24 * time.Hour)
+
+            sql.Register("sqlite3_with_extensions",
+                &sqlite3.SQLiteDriver{
+                    Extensions: []string{
+                        "sqlite3_mod_regexp",
+                    },
+                })
+
+            db, err := sql.Open("sqlite3", databaseURI)
+            if err != nil {
+                fmt.Println(err)
+                return
+            }
+            defer func() {
+                if err := db.Close(); err != nil {
+                    fmt.Println(err)
+                }
+            }()
+
+            row := db.QueryRow(
+                "SELECT full_name, birthday FROM candidates WHERE full_name = $1 AND birthday = $2", 
+                fullname, "1980-01-14",
             )
+
+            if err != nil {
+                fmt.Println(err)
+                return
+            }
+
+            cand := person{}
+            err = row.Scan(&cand.id, &cand.fullname, &cand.birthday, &cand.info, &cand.initiator)
+            if err != nil || err == sql.ErrNoRows {
+                return
+            }
+            if err == sql.ErrNoRows {
+                cand.id = db.Exec(
+                    "INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES ($1, $2, $3, $4, $5, $6)", 
+                        cand.fullname, cand.birthday, cand.deadline, 1, 1, 9,
+                            )
+            } else {
+                db.Exec("UPDATE persons SET update = $1 WHERE id = $2",
+                    deadline, cand.id,
+                )
+            }
+            db.Exec(
+                "INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES ($1, $2, $3, $4)",
+                    cand.info, cand.initiator, cand.deadline, cand.id,
+            )
+        }
+    }
+}    
+
+func parseMainFile() {
+    numRow := getNums(workPath, "K")
+
+    if len(numRow) > 0 {
+        // list of directories with candidates names
+        f, err := excelize.OpenFile(mainFile)
         if err != nil {
             fmt.Println(err)
             return
         }
+        defer func() {
+            if err := f.Close(); err != nil {
+                fmt.Println(err)
+            }
+        }()
+
+        var fio []string
+        for _, num := range numRow {
+            cell, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", i))
+        }
+        if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+        if cell != "" {
+            fio = append(fio, strings.Trim(strings.ToLower(cell)))
+		}
         
-        if not result:
-            cursor.execute("INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) \
-                            VALUES (?, ?)", (chart["fullname"], chart["birthday"],
-                                            chart["deadline"]), 1, 1, 9)
-        else:
-            cursor.execute("UPDATE persons SET update = ? WHERE id = ?",
-                        date.today(), result[0])
-        cursor.execute("INSERT INTO inquiries (info, initiator, deadline, person_id) \
-                        VALUES (?, ?, ?, ?)",
-                        (chart["info"], chart["initiator"], date.today(), result[0]))
-        conn.commit()
-    }
-    wb.close()
-}    
+        var subdir []string
 
-func parseMainFile() {
-	wb := excelize.OpenFile(mainFile)
-}
-
-
-def parseMainFile():
-    wb = load_workbook(Config.MAIN_FILE, keep_vba=True, read_only=False)
-    ws = wb.workwss[0]
-    num_row = range_row(ws["K"])
-
-    if len(num_row):
-        # list of directories with candidates names
-        fio = [ws["B" + str(i)].value.strip().lower() for i in num_row]
         subdir = [sub for sub in os.listdir(Config.WORK_DIR) if sub.lower().strip() in fio]
 
         if len(subdir):
