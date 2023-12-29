@@ -1,26 +1,26 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
-    "strings"
-    "database/sql"
+
+	"github.com/mattn/go-sqlite3"
+	"github.com/xuri/excelize/v2"
 )
 
-import (
-    "github.com/xuri/excelize/v2"
-    "github.com/mattn/go-sqlite3"
-)
-
-type infoFile struct {
-    id int
-    info string
-    initiator string
-    fullname string
-    birthday time.Time
-    deadline time.Time
+type regisry struct {
+	id        int
+	info      string
+	initiator string
+	fullname  string
+	decision  string
+	url       string
+	birthday  time.Time
+	deadline  time.Time
 }
 
 var basePath string = filepath.Join(currentPath(), "..")
@@ -54,8 +54,8 @@ func main() {
 
 	workFileDate := workFileStat.ModTime().Truncate(24 * time.Hour)
 	infoFileDate := infoFileStat.ModTime().Truncate(24 * time.Hour)
-    
-	if time.Now().Truncate(24 * time.Hour).Equal(workFileDate) || time.Now().Truncate(24 * time.Hour).Equal(infoFileDate) {
+
+	if time.Now().Truncate(24*time.Hour).Equal(workFileDate) || time.Now().Truncate(24*time.Hour).Equal(infoFileDate) {
 		os.Rename(databaseURI, filepath.Join(archiveDir, database))
 	}
 	if time.Now().Truncate(24 * time.Hour).Equal(infoFileDate) {
@@ -68,7 +68,7 @@ func main() {
 	}
 }
 
-func getNums(fileName, colName  string) []int {
+func getNums(fileName, colName string) []int {
 	f, err := excelize.OpenFile(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -102,182 +102,258 @@ func getNums(fileName, colName  string) []int {
 }
 
 func parseInfoFile() {
-    numRow := getNums(workPath, "G")
+	numRow := getNums(workPath, "G")
 
-    if len(numRow) > 0 {
-        f, err := excelize.OpenFile(mainFile)
-        if err != nil {
-            fmt.Println(err)
-            return
-        }
-        defer func() {
-            if err := f.Close(); err != nil {
-                fmt.Println(err)
-            }
-        }()
+	if len(numRow) > 0 {
+		f, err := excelize.OpenFile(infoPath)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer func() {
+			if err := f.Close(); err != nil {
+				fmt.Println(err)
+			}
+		}()
 
-        for _, num := range numRow {
-            info, _ := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
-            initiator, _ := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
-            fullname, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
-            birth, _ := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
-            day, _ := time.Parse("02/01/2006", birth)
-            birthday := day.Local()
-            deadline := time.Now().Truncate(24 * time.Hour)
+		for _, num := range numRow {
+			info, _ := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
+			initiator, _ := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
+			fullname, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+			birth, _ := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
+			day, _ := time.Parse("02/01/2006", birth)
+			birthday := day.Local()
+			deadline := time.Now().Truncate(24 * time.Hour)
 
-            sql.Register("sqlite3_with_extensions",
-                &sqlite3.SQLiteDriver{
-                    Extensions: []string{
-                        "sqlite3_mod_regexp",
-                    },
-                })
+			sql.Register("sqlite3_with_extensions",
+				&sqlite3.SQLiteDriver{
+					Extensions: []string{
+						"sqlite3_mod_regexp",
+					},
+				})
 
-            db, err := sql.Open("sqlite3", databaseURI)
-            if err != nil {
-                fmt.Println(err)
-                return
-            }
-            defer func() {
-                if err := db.Close(); err != nil {
-                    fmt.Println(err)
-                }
-            }()
+			db, err := sql.Open("sqlite3", databaseURI)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			defer func() {
+				if err := db.Close(); err != nil {
+					fmt.Println(err)
+				}
+			}()
 
-            row := db.QueryRow(
-                "SELECT full_name, birthday FROM candidates WHERE full_name = $1 AND birthday = $2", 
-                fullname, "1980-01-14",
-            )
+			row := db.QueryRow(
+				"SELECT full_name, birthday FROM candidates WHERE full_name = $1 AND birthday = $2",
+				fullname, birthday,
+			)
 
-            if err != nil {
-                fmt.Println(err)
-                return
-            }
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 
-            cand := person{}
-            err = row.Scan(&cand.id, &cand.fullname, &cand.birthday, &cand.info, &cand.initiator)
-            if err != nil || err == sql.ErrNoRows {
-                return
-            }
-            if err == sql.ErrNoRows {
-                cand.id = db.Exec(
-                    "INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES ($1, $2, $3, $4, $5, $6)", 
-                        cand.fullname, cand.birthday, cand.deadline, 1, 1, 9,
-                            )
-            } else {
-                db.Exec("UPDATE persons SET update = $1 WHERE id = $2",
-                    deadline, cand.id,
-                )
-            }
-            db.Exec(
-                "INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES ($1, $2, $3, $4)",
-                    cand.info, cand.initiator, cand.deadline, cand.id,
-            )
-        }
-    }
-}    
+			cand := person{}
+			err = row.Scan(&cand.id, &cand.fullname, &cand.birthday, &cand.info, &cand.initiator)
+			if err != nil || err == sql.ErrNoRows {
+				return
+			}
+			if err == sql.ErrNoRows {
+				cand.id = db.Exec(
+					"INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES ($1, $2, $3, $4, $5, $6)",
+					cand.fullname, cand.birthday, cand.deadline, 1, 1, 9,
+				)
+			} else {
+				db.Exec("UPDATE persons SET update = $1 WHERE id = $2",
+					deadline, cand.id,
+				)
+			}
+			db.Exec(
+				"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES ($1, $2, $3, $4)",
+				cand.info, cand.initiator, cand.deadline, cand.id,
+			)
+		}
+	}
+}
 
 func parseMainFile() {
-    numRow := getNums(workPath, "K")
+	numRow := getNums(workPath, "K")
 
-    if len(numRow) > 0 {
-        // list of directories with candidates names
-        f, err := excelize.OpenFile(mainFile)
-        if err != nil {
-            fmt.Println(err)
-            return
-        }
-        defer func() {
-            if err := f.Close(); err != nil {
-                fmt.Println(err)
-            }
-        }()
-
-        var fio []string
-        for _, num := range numRow {
-            cell, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", i))
-        }
-        if err != nil {
+	if len(numRow) > 0 {
+		// list of directories with candidates names
+		f, err := excelize.OpenFile(mainFile)
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+			return
+		}
+		var fio []string
+		for _, num := range numRow {
+			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", i))
+		}
+		if err != nil {
 			fmt.Println(err)
 			return nil
 		}
-        if cell != "" {
-            fio = append(fio, strings.Trim(strings.ToLower(cell)))
+		if cell != "" {
+			fio = append(fio, strings.Trim(strings.ToLower(cell)))
 		}
-        
-        var subdir []string
 
-        subdir = [sub for sub in os.listdir(Config.WORK_DIR) if sub.lower().strip() in fio]
+		var subdir []string
+		for _, dir := range os.ReadDir(workPath) {
 
-        if len(subdir):
-            # получаем список путей к файлам Заключений
-            excel_path = []
-            json_path = []
+			for _, name := range fio {
 
-            for sub in subdir:
-                subdir_path = os.path.join(Config.WORK_DIR, sub)
-                for file in os.listdir(subdir_path):
-                    if (file.startswith("Заключение") or file.startswith("Результаты")) \
-                        and (file.endswith("xlsm") or file.endswith("xlsx")):
-                        excel_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))
-                    elif file.endswith("json"):
-                        json_path.append(os.path.join(Config.WORK_DIR, subdir_path, file))
+				if strings.ToLower(dir) == strings.ToLower(name) {
+					subdir = append(subdir, dir)
+				}
+			}
+		}
 
-            # parse files and send info to database
-            if len(excel_path):
-                excel_to_db(excel_path)
-            if len(json_path):
-                json_to_db(json_path)
+		// получаем список путей к файлам Заключений
+		if len(subdir) > 0 {
+			var excelPath []string
+			var jsonPath []string
 
-            # create url and move folders to archive
-            for n in num_row:
-                for sub in subdir:
-                    if str(ws["B" + str(n)].value.strip().lower()) == sub.strip().lower():
-                        sbd = ws["B" + str(n)].value.strip()
-                        lnk = os.path.join(Config.ARCHIVE_DIR_2, sbd[0][0], f"{sbd} - {ws["A" + str(n)].value}")
-                        ws["L" + str(n)].hyperlink = str(lnk)  # записывает в книгу
-                        shutil.move(os.path.join(Config.WORK_DIR, sbd), lnk)
+			for _, sub := range subdir {
+				subdirPath := filepath.Join(workPath, sub)
 
-             screenRegistryData(ws, num_row)
-        wb.save(Config.MAIN_FILE)
-    else:
-        wb.close()
+				for _, file := range os.ReadDir(subdirPath) {
 
-def screenRegistryData(ws, num_row):
-    for num in num_row:
-        chart = {"fullname": ws["A" + str(num)].value,
-                 "birthday": (ws["B" + str(num)].value).date() \
-                    if isinstance(ws["B" + str(num)].value, datetime)
-                        else date.today(),
-                 "decision": ws[f"J{num}"].value,
-                 "deadline": date.today(),
-                 "url": ws[f"L{num}"].value}
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            person = cursor.execute(
-                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-                (chart["fullname"], chart["birthday"])
-            )
-            result = person.fetchone()
-            if not result:
-                cursor.execute("INSERT INTO persons (fullname, birthday, path)",
-                               (chart["fullname"], chart["birthday"], chart["url"]))
+					if (strings.HasPrefix(file, "Заключение") && strings.HasPrefix(file, "Результаты")) || (strings.HasSuffix(file, "xlsm") && strings.HasSuffix(file, "xlsx")) {
+						excelPath = append(excelPath, filepath.Join(subdirPath, sub, file))
 
-                cursor.execute(f"UPDATE checks SET conclusion_id = ?, deadline = ?, person_id = ?)",
-                               (get_conclusion_id(chart["decision"]),
-                                chart["deadline"], cursor.lastrowid))
-            else:
-                cursor.execute("UPDATE persons SET path = ? WHERE id = ?",
-                               (chart["url"], result[0]))
-            conn.commit()
+					} else if strings.HasSuffix(file, "json") {
+						jsonPath = append(jsonPath, subdirPath, sub, file)
+					}
+				}
+			}
+			// parse files and send info to database
+			if len(excelPath) > 0 {
+				excelParse(excel_path)
+			}
+			if len(jsonPath) {
+				jsonParse(json_path)
+			}
 
-def get_conclusion_id(name):
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM conclusions WHERE LOWER conclusion = ?",
-                (name.lower(), )
-            )
-            result = cursor.fetchone()
-            return result[0] if result else 1
+			// create url and move folders to archive
+			for _, num := range numRow {
+				for _, sub := range subdir {
+					cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%B%d", num))
+					if err != nil {
+						fmt.Println(err)
+						return nil
+					}
+					if strings.ToLower(strings.Trim(cell)) == strings.ToLower(strings.Trim(sub)) {
+						id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%A%d", num))
+						lnk := filepath.Join(archiveDir2, cell[0:1], fmt.Sprintf("%s-%s", cell, id))
+						f.SetCellValue("Кандидаты", lnk)
+						os.Rename(filepath.Join(workDir, sub), lnk)
+					}
+				}
+			}
+			screenRegistryData(numRow)
+		}
+		f.saveAs(workFile)
+	} else {
+		f.Close()
+	}
+}
+
+func screenRegistryData(numRow []string) {
+	f, err := excelize.OpenFile(mainFile)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	for _, num := range numRow {
+		decision, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("J%d", num))
+		url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+		fullname, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+		birth, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("C%d", num))
+		day, _ := time.Parse("02/01/2006", birth)
+		birthday := day.Local()
+		deadline := time.Now().Truncate(24 * time.Hour)
+
+		sql.Register("sqlite3_with_extensions",
+			&sqlite3.SQLiteDriver{
+				Extensions: []string{
+					"sqlite3_mod_regexp",
+				},
+			})
+
+		db, err := sql.Open("sqlite3", databaseURI)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				fmt.Println(err)
+			}
+		}()
+
+		row := db.QueryRow(
+			"SELECT id, fullname, birrthday FROM persons WHERE fullname = $1 AND birthday = $2",
+			fullname, birthday,
+		)
+		cand := person{}
+		err = row.Scan(&cand.id, &cand.fullname, &cand.birthday, &cand.decision, &cand.url)
+		if err != nil || err == sql.ErrNoRows {
+			return
+		}
+		if err == sql.ErrNoRows {
+			row = db.Exec(
+				"INSERT INTO persons (fullname, birthday, path)",
+				fullname, birthday, url,
+			)
+			db.Exec(
+				"UPDATE checks SET conclusion_id = $1, deadline = $2, person_id = $3)",
+				getConclusionId(cand.decision), deadline, row.lastRowId,
+			)
+		} else {
+			db.Exec(
+				"UPDATE persons SET path = $1 WHERE id = $2",
+				url, cand.id,
+			)
+		}
+	}
+}
+
+func getConclusionId(conclusion string) {
+	sql.Register("sqlite3_with_extensions",
+		&sqlite3.SQLiteDriver{
+			Extensions: []string{
+				"sqlite3_mod_regexp",
+			},
+		})
+
+	db, err := sql.Open("sqlite3", databaseURI)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	row := db.QueryRow(
+		"SELECT id conclusions WHERE LOWER conclusion = $2",
+		conclusion,
+	)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if row > 0 {
+		return row
+	}
+	return 1
+}
