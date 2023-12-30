@@ -1,253 +1,349 @@
-import json
-import sqlite3
-from datetime import datetime
+package main
 
-from config import Config
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+	"time"
 
+	_ "github.com/mattn/go-sqlite3"
+)
 
-def json_to_db(json_path):
-    for json_file in json_path:
-        json_data = JsonFile(json_file)
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-                (json_data.resume['fullname'], json_data.resume['birthday'])
-            )
-            result = cursor.fetchone()
-            person_id = result[0] if result else None
-        
-            if person_id:
-                cursor.execute(
-                    f"UPDATE persons SET {','.join(json_data.resume['resume'].keys())} "
-                    f"WHERE id = {person_id}",
-                    tuple(json_data.resume['resume'].values())
-                )
-            else:
-                cursor.execute(
-                    f"INSERT INTO persons ({','.join(json_data.resume['resume'].keys())}) "
-                    f"VALUES ({','.join(['?'] * len(json_data.resume['resume'].values()))})", 
-                    tuple(json_data.resume['resume'].values())
-                )
-                person_id = cursor.lastrowid
-            
-            models = ['staffs', 'documents', 'addresses', 'contacts', 'workplaces', 'affilations']
-            items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
-                            json_data.contacts, json_data.workplaces, json_data.affilation]
-            
-            for model, items in zip(models, items_lists):
-                for item in items:
-                    if item:
-                        cursor.execute(
-                            f"INSERT INTO {model} ({','.join(item.keys())}, person_id) ",
-                            tuple(item.values()) + (person_id,)
-                        )
-            conn.commit()
+type NameChange struct {
+	Reason                   string `json:"reason"`
+	FirstNameBeforeChange    string `json:"firstNameBeforeChange"`
+	LastNameBeforeChange     string `json:"lastNameBeforeChange"`
+	HasNoMidNameBeforeChange bool   `json:"hasNoMidNameBeforeChange"`
+	YearOfChange             int    `json:"yearOfChange"`
+	NameChangeDocument       string `json:"nameChangeDocument"`
+}
 
+type Education struct {
+	EducationType   string `json:"educationType"`
+	InstitutionName string `json:"institutionName"`
+	BeginYear       int    `json:"beginYear"`
+	EndYear         int    `json:"endYear"`
+	Specialty       string `json:"specialty"`
+}
 
-class JsonFile:
-    """ Create class for import data from json file"""
+type Experience struct {
+	BeginDate                         string `json:"beginDate"`
+	EndDate                           string `json:"endDate,omitempty"`
+	CurrentJob                        bool   `json:"currentJob,omitempty"`
+	Name                              string `json:"name"`
+	Address                           string `json:"address"`
+	Phone                             string `json:"phone"`
+	ActivityType                      string `json:"activityType"`
+	Position                          string `json:"position"`
+	IsPositionMatchEmploymentContract bool   `json:"isPositionMatchEmploymentContract,omitempty"`
+	EmploymentContractPosition        string `json:"employmentContractPosition,omitempty"`
+	FireReason                        string `json:"fireReason,omitempty"`
+}
 
-    def __init__(self, file) -> None:
-        with open(file, 'r', newline='', encoding='utf-8-sig') as f:
-            self.json_dict = json.load(f)
+type Organization struct {
+	View     string `json:"view"`
+	Inn      string `json:"inn"`
+	OrgType  string `json:"orgType"`
+	Name     string `json:"name"`
+	Position string `json:"position"`
+}
 
-            self.resume = {
-                'region_id': self.parse_region(),
-                'category_id': self.get_category_id("Кандидат"),
-                'status_id': self.get_status_id("Окончено"),
-                'fullname': self.parse_fullname(),
-                'previous': self.parse_previous(),
-                'birthday': datetime.strptime(self.json_dict.get('birthday', '1900-01-01'), 
-                                              '%Y-%m-%d'),
-                'birthplace': self.json_dict.get('birthplace', ''),
-                'country': self.json_dict.get('citizen' ''),
-                'ext_country': self.json_dict.get('additionalCitizenship', ''),
-                'snils': self.json_dict.get('snils', ''),
-                'inn': self.json_dict.get('inn', ''),
-                'marital': self.json_dict.get('maritalStatus', ''),
-                'education': self.parse_education()
-            }
-            
-            self.workplaces = self.parse_workplace()
-            
-            self.passport = [
-                {
-                    'view': 'Паспорт',
-                    'series': self.json_dict.get('passportSerial', ''),
-                    'number': self.json_dict.get('passportNumber', ''),
-                    'issue': datetime.strptime(
-                        self.json_dict.get('passportIssueDate', '1900-01-01'), '%Y-%m-%d'
-                        ),
-                    'agency': self.json_dict.get('passportIssuedBy', ''),
-                }
-            ]
-            self.addresses = [
-                {
-                    'view': "Адрес регистрации", 
-                    'address': self.json_dict.get('regAddress', ''),
-                },
-                {
-                    'view': "Адрес проживания", 
-                    'address': self.json_dict.get('validAddress', ''),
-                }
-            ]
-            self.contacts = [
-                {
-                    'view': 'Мобильный телефон', 
-                    'contact': self.json_dict.get('contactPhone', ''),
-                },
-                {
-                    'view': 'Электронная почта', 
-                    'contact': self.json_dict.get('email', ''),
-                }
-            ]
-            self.staff = [
-                {
-                    'position': self.json_dict.get('positionName', ''),
-                    'department': self.json_dict.get('department', '')
-                }
-            ]
-            self.affilation = self.parse_affilation()
-    
-    def get_category_id(self, name):
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM categories WHERE category = ?",
-                (name, )
-            )
-            result = cursor.fetchone()
-            return result[0] if result else 1
-    
-    def get_status_id(self, name):
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM statuses WHERE status = ?",
-                (name, )
-            )
-            result = cursor.fetchone()
-            return result[0] if result else 1
-        
-    def get_region_id(self, name):
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM regions WHERE region = ?",
-                (name, )
-            )
-            result = cursor.fetchone()
-            return result[0]
+type Person struct {
+	PositionName                      string         `json:"positionName"`
+	Department                        string         `json:"department"`
+	StatusDate                        string         `json:"statusDate"`
+	LastName                          string         `json:"lastName"`
+	FirstName                         string         `json:"firstName"`
+	MidName                           string         `json:"midName"`
+	HasNameChanged                    bool           `json:"hasNameChanged"`
+	NameWasChanged                    []NameChange   `json:"nameWasChanged"`
+	Birthday                          string         `json:"birthday"`
+	Birthplace                        string         `json:"birthplace"`
+	Citizen                           string         `json:"citizen"`
+	HasAdditionalCitizenship          bool           `json:"hasAdditionalCitizenship"`
+	AdditionalCitizenship             string         `json:"additionalCitizenship"`
+	MaritalStatus                     string         `json:"maritalStatus"`
+	RegAddress                        string         `json:"regAddress"`
+	ValidAddress                      string         `json:"validAddress"`
+	ContactPhone                      string         `json:"contactPhone"`
+	HasNoRussianContactPhone          bool           `json:"hasNoRussianContactPhone"`
+	Email                             string         `json:"email"`
+	HasInn                            bool           `json:"hasInn"`
+	Inn                               string         `json:"inn"`
+	HasSnils                          bool           `json:"hasSnils"`
+	Snils                             string         `json:"snils"`
+	PassportSerial                    string         `json:"passportSerial"`
+	PassportNumber                    string         `json:"passportNumber"`
+	PassportIssueDate                 string         `json:"passportIssueDate"`
+	PassportIssuedBy                  string         `json:"passportIssuedBy"`
+	Education                         []Education    `json:"education"`
+	HasJob                            bool           `json:"hasJob"`
+	Experience                        []Experience   `json:"experience"`
+	HasPublicOfficeOrganizations      bool           `json:"hasPublicOfficeOrganizations"`
+	PublicOfficeOrganizations         []Organization `json:"publicOfficeOrganizations"`
+	HasStateOrganizations             bool           `json:"hasStateOrganizations"`
+	StateOrganizations                []Organization `json:"stateOrganizations"`
+	HasRelatedPersonsOrganizations    bool           `json:"hasRelatedPersonsOrganizations"`
+	RelatedPersonsOrganizations       []Organization `json:"relatedPersonsOrganizations"`
+	HasMtsRelatedPersonsOrganizations bool           `json:"hasMtsRelatedPersonsOrganizations"`
+	MtsRelatedPersonsOrganizations    []Organization `json:"mtsRelatedPersonsOrganizations"`
+	HasOrganizations                  bool           `json:"hasOrganizations"`
+	Organizations                     []Organization `json:"organizations"`
+}
 
-    def parse_region(self):
-        if 'department' in self.json_dict:
-            region_id = 1
-            divisions = self.json_dict['department'].split('/')
-            for div in divisions:
-                region = self.get_region_id(div)
-                if region:
-                    region_id = region
-            return region_id
+func jsonParse(jsonPaths []string) {
+	db, err := sql.Open("sqlite3", databaseURI)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer db.Close()
 
-    def parse_fullname(self):
-        lastName = self.json_dict.get('lastName')
-        firstName = self.json_dict.get('firstName')
-        midName = self.json_dict.get('midName', '')
-        return f"{lastName} {firstName} {midName}".rstrip()
-    
-    def parse_previous(self):
-        if 'hasNameChanged' in self.json_dict:
-            if len(self.json_dict['nameWasChanged']):
-                previous = []
-                for item in self.json_dict['nameWasChanged']:
-                    firstNameBeforeChange = item.get('firstNameBeforeChange', '')
-                    lastNameBeforeChange = item.get('lastNameBeforeChange', '')
-                    midNameBeforeChange = item.get('midNameBeforeChange', '')
-                    yearOfChange = str(item.get('yearOfChange', ''))
-                    reason = str(item.get('reason', ''))
-                    previous.append(f"{yearOfChange} - {firstNameBeforeChange} "
-                                    f"{lastNameBeforeChange} {midNameBeforeChange}, "
-                                    f"{reason}".replace("  ", ""))
-                return '; '.join(previous)
-        return ''
-    
-    def parse_education(self):
-        if 'education' in self.json_dict:
-            if len(self.json_dict['education']):
-                education = []
-                for item in self.json_dict['education']:
-                    institutionName = item.get('institutionName')
-                    endYear = item.get('endYear', 'н.в.')
-                    specialty = item.get('specialty')
-                    education.append(f"{str(endYear)} - {institutionName}, "
-                                     f"{specialty}".replace("  ", ""))
-                return '; '.join(education)
-        return ''
-    
-    def parse_workplace(self):
-        if 'experience' in self.json_dict:
-            if len(self.json_dict['experience']):
-                experience = []
-                for item in self.json_dict['experience']:
-                    work = {
-                        'start_date': datetime.strptime(item.get('beginDate', '1900-01-01'), '%Y-%m-%d'),
-                        'end_date': datetime.strptime(item['endDate'], '%Y-%m-%d') \
-                            if 'endDate' in item else datetime.now(),
-                        'workplace': item.get('name', ''),
-                        'address': item.get('address', ''),
-                        'position': item.get('position', ''),
-                        'reason': item.get('fireReason', '')
-                    }
-                    experience.append(work)
-                return experience
-        return []
-    
-    def parse_affilation(self):
-        affilation = []
-        if self.json_dict['hasPublicOfficeOrganizations']:
-            if len(self.json_dict['publicOfficeOrganizations']):
-                for item in self.json_dict['publicOfficeOrganizations']:
-                    public = {
-                        'view': 'Являлся государственным или муниципальным служащим',
-                        'name': f"{item.get('name', '')}",
-                        'position': f"{item.get('position', '')}"
-                    }
-                    affilation.append(public)
+	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtSelectPerson.Close()
 
-        if self.json_dict['hasStateOrganizations']:
-            if len(self.json_dict['stateOrganizations']):
-                for item in self.json_dict['publicOfficeOrganizations']:
-                    state = {
-                        'view': 'Являлся государственным должностным лицом',
-                        'name': f"{item.get('name', '')}",
-                        'position': f"{item.get('position', '')}"
-                    }
-                    affilation.append(state)
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, create = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtUpdatePerson.Close()
 
-        if self.json_dict['hasRelatedPersonsOrganizations']:
-            if len(self.json_dict['relatedPersonsOrganizations']):
-                for item in self.json_dict['relatedPersonsOrganizations']:
-                    related = {
-                        'view': 'Связанные лица работают в госудраственных организациях',
-                        'name': f"{item.get('name', '')}",
-                        'position': f"{item.get('position', '')}",
-                        'inn': f"{item.get('inn'), ''}"
-                    }
-                    affilation.append(related)
-        
-        if self.json_dict['hasOrganizations']:
-            if len(self.json_dict['organizations']):
-                for item in self.json_dict['organizations']:
-                    organization = {
-                        'view': 'Участвует в деятельности коммерческих организаций"',
-                        'name': f"{item.get('name', '')}",
-                        'position': f"{item.get('workCombinationTime', '')}",
-                        'inn': f"{item.get('inn'), ''}"
-                    }
-                    affilation.append(organization)
-        return affilation
+	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, update, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertPerson.Close()
+
+	stmtInsertStaff, err := db.Prepare("INSERT INTO staffs (position, department, person_id) VALUES (?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertStaff.Close()
+
+	stmtInsertDocument, err := db.Prepare("INSERT INTO documents (view, series, number, issue, agency, person_id) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertDocument.Close()
+
+	stmtInsertAddress, err := db.Prepare("INSERT INTO addresses (view, address, person_id) VALUES (?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertAddress.Close()
+
+	stmtInsertContacts, err := db.Prepare("INSERT INTO contacts (view, contact, person_id) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertContacts.Close()
+
+	stmtInsertAffiliation, err := db.Prepare("INSERT INTO affiliations (view, name, inn, position, person_id) VALUES (?, ?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertAffiliation.Close()
+
+	stmtInsertWorkplace, err := db.Prepare("INSERT INTO workplaces (start_date, end_date, position, organization, reason, person_id) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertWorkplace.Close()
+
+	for _, path := range jsonPaths {
+		f, err := os.Open(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+
+		var candId int
+		var person Person
+
+		jsonData, err := io.ReadAll(f)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		err = json.Unmarshal(jsonData, &person)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		result := stmtSelectPerson.QueryRow(resume.fullname, resume.birthday)
+		err = result.Scan(&candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if candId == 0 {
+			ins, err := stmtInsertPerson.Exec(
+				person.parseFullname(), person.parsePrevious(), person.parseBirthday(), person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+			insId, err := ins.LastInsertId()
+			if err != nil {
+				log.Fatal(err)
+			}
+			candId = int(insId)
+
+		} else {
+			_, err := stmtUpdatePerson.Exec(
+				person.parseFullname(), person.parsePrevious(), person.parseBirthday(), person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId, candId,
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		_, err = stmtInsertStaff.Exec(person.PositionName, person.Department, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmtInsertDocument.Exec(person.PassportSerial, person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, person.PassportIssuedBy, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmtInsertAddress.Exec("Адрес проживания", person.ValidAddress, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmtInsertAddress.Exec("Адрес регистрации", person.RegAddress, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmtInsertContacts.Exec("Телефон", person.ContactPhone, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmtInsertContacts.Exec("Электронная почта", person.Email, candId)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, item := range person.parseAffilation() {
+			_, err = stmtInsertAffiliation.Exec(item.View, item.Inn, item.Position, item.Name, candId)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		for _, item := range person.parseWorkplace() {
+			_, err = stmtInsertWorkplace.Exec(
+				item.BeginDate, item.EndDate, item.Name, item.Position, item.FireReason, candId)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+		}
+	}
+}
+
+func (person Person) parseFullname() string {
+	return fmt.Sprintf("%s %s %s", person.LastName, person.FirstName, person.MidName)
+}
+
+func (person Person) parseBirthday() time.Time {
+	t, err := time.Parse("2006-01-02", person.Birthday)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return t
+}
+
+func (person Person) parsePrevious() string {
+	var previous []string
+	if person.HasNameChanged {
+		for _, item := range person.NameWasChanged {
+			previous = append(previous, fmt.Sprintf("%s - %s %d %s, %s",
+				item.FirstNameBeforeChange, item.LastNameBeforeChange, item.YearOfChange, item.NameChangeDocument, item.Reason))
+		}
+	}
+	return strings.Join(previous, "")
+}
+
+func (person Person) parseEducation() string {
+	var education []string
+	if len(person.Education) > 0 {
+		for _, item := range person.Education {
+			education = append(education, fmt.Sprintf("%s %s %d %d", item.EducationType, item.InstitutionName, item.BeginYear, item.EndYear))
+		}
+	}
+	return strings.Join(education, "")
+}
+
+func (person Person) parseWorkplace() []Experience {
+	var expirience []Experience
+	if len(person.Experience) > 0 {
+		for _, item := range person.Experience {
+			expirience = append(expirience, Experience{
+				BeginDate:  item.BeginDate,
+				EndDate:    item.EndDate,
+				Name:       item.Name,
+				Address:    item.Address,
+				Position:   item.Position,
+				FireReason: item.FireReason,
+			})
+		}
+	}
+	return expirience
+}
+
+func (person Person) parseAffilation() []Organization {
+	var affilation []Organization
+	if person.HasPublicOfficeOrganizations {
+		for _, item := range person.PublicOfficeOrganizations {
+			affilation = append(affilation, Organization{
+				View:     "Являлся государственным или муниципальным служащим",
+				Name:     item.Name,
+				Position: item.Position,
+			})
+		}
+	}
+	if person.HasStateOrganizations {
+		for _, item := range person.StateOrganizations {
+			affilation = append(affilation, Organization{
+				View:     "Являлся государственным должностным лицом",
+				Name:     item.Name,
+				Position: item.Position,
+			})
+		}
+	}
+	if person.HasRelatedPersonsOrganizations {
+		for _, item := range person.RelatedPersonsOrganizations {
+			affilation = append(affilation, Organization{
+				View:     "Связанные лица работают в госудраственных организациях",
+				Name:     item.Name,
+				Position: item.Position,
+				Inn:      item.Inn,
+			})
+		}
+	}
+	if person.HasOrganizations {
+		for _, item := range person.Organizations {
+			affilation = append(affilation, Organization{
+				View:     "Участвует в деятельности коммерческих организаций",
+				Name:     item.Name,
+				Position: item.Position,
+				Inn:      item.Inn,
+			})
+		}
+	}
+	return affilation
+}

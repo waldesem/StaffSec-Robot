@@ -29,32 +29,30 @@ var resume struct {
 }
 
 var check struct {
-	workplace   string
-	cronos      string
-	cros        string
-	document    string
-	debt        string
-	bankruptcy  string
-	bki         string
-	affiliation string
-	internet    string
-	pfo         bool
-	addition    string
-	conclusion  string
-	officer     string
-	deadline    time.Time
-	idCandidate int
+	workplace    string
+	cronos       string
+	cros         string
+	document     string
+	debt         string
+	bankruptcy   string
+	bki          string
+	affiliation  string
+	internet     string
+	pfo          bool
+	addition     string
+	conclusionId int
+	officer      string
+	deadline     time.Time
 }
 
 var robot struct {
-	inn         string
-	employee    string
-	terrorist   string
-	mvd         string
-	courts      string
-	bankruptcy  string
-	bki         string
-	idCandidate int
+	inn        string
+	employee   string
+	terrorist  string
+	mvd        string
+	courts     string
+	bankruptcy string
+	bki        string
 }
 
 func excelParse(excelPaths []string) {
@@ -77,19 +75,19 @@ func excelParse(excelPaths []string) {
 	}
 	defer stmtUpdatePerson.Close()
 
-	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)")
+	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, create, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
-	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (person_id, conclusion_id, deadline) VALUES (?, ?, ?)")
+	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affiliation, internet, pfo, addition, conclusion_id, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertCheck.Close()
 
-	stmtInsertRobot, err := db.Prepare("INSERT INTO robots (person_id) VALUES (?)")
+	stmtInsertRobot, err := db.Prepare("INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,7 +102,7 @@ func excelParse(excelPaths []string) {
 
 		var candId int
 
-		if strings.hasPrefix(path, "Заключение") {
+		if strings.HasPrefix(path, "Заключение") {
 			if f.SheetCount > 1 {
 				fio, err := f.GetCellValue("Лист2", "K1")
 				if err != nil {
@@ -120,10 +118,15 @@ func excelParse(excelPaths []string) {
 					if err != nil {
 						resume.previous = err.Error()
 					}
-					resume.birthday, err = f.GetCellValue("Лист2", "L3")
+					birth, err := f.GetCellValue("Лист2", "L3")
 					if err != nil {
-						resume.birthday = err.Error()
+						birth = "02/01/2006"
 					}
+					day, err := time.Parse("02/01/2006", birth)
+					if err != nil {
+						day = time.Now().Truncate(24 * time.Hour)
+					}
+					resume.birthday = day
 					resume.birthplace, err = f.GetCellValue("Лист2", "M3")
 					if err != nil {
 						resume.birthplace = err.Error()
@@ -151,10 +154,15 @@ func excelParse(excelPaths []string) {
 			if err != nil {
 				resume.fullname = err.Error()
 			}
-			resume.birthday, err = f.GetCellValue("Лист1", "C8")
+			birth, err := f.GetCellValue("Лист1", "C8")
 			if err != nil {
-				resume.birthday = err.Error()
+				birth = "02/01/2006"
 			}
+			day, err := time.Parse("02/01/2006", birth)
+			if err != nil {
+				day = time.Now().Truncate(24 * time.Hour)
+			}
+			resume.birthday = day
 			resume.previous, err = f.GetCellValue("Лист1", "C9")
 			if err != nil {
 				resume.previous = err.Error()
@@ -199,14 +207,13 @@ func excelParse(excelPaths []string) {
 			if err != nil {
 				check.internet = err.Error()
 			}
-			check.conclusion, err = f.GetCellValue("Лист1", "C23")
+			conclusion, err := f.GetCellValue("Лист1", "C23")
 			if err != nil {
-				check.conclusion = err.Error()
+				check.conclusionId = 1
+			} else {
+				check.conclusionId = getConclusionId(conclusion)
 			}
-			check.deadline, err = f.GetCellValue("Лист1", "C24")
-			if err != nil {
-				check.deadline = err.Error()
-			}
+			check.deadline = time.Now().Truncate(24 * time.Hour)
 			poligraf, err := f.GetCellValue("Лист1", "C26")
 			if err != nil {
 				poligraf = "не назначалось"
@@ -226,10 +233,16 @@ func excelParse(excelPaths []string) {
 			if err != nil {
 				resume.fullname = err.Error()
 			}
-			resume.birthday, err = f.GetCellValue("Лист1", "L3")
+			birth, err := f.GetCellValue("Лист1", "L3")
 			if err != nil {
-				resume.birthday = err.Error()
+				birth = "02/01/2006"
 			}
+			day, err := time.Parse("02/01/2006", birth)
+			if err != nil {
+				day = time.Now().Truncate(24 * time.Hour)
+			}
+			resume.birthday = day
+
 			robot.employee, err = f.GetCellValue("Лист1", "B27")
 			if err != nil {
 				robot.employee = err.Error()
@@ -276,7 +289,9 @@ func excelParse(excelPaths []string) {
 		}
 
 		if candId == 0 {
-			ins, err := stmtInsertPerson.Exec(resume.fullname, resume.birthday)
+			ins, err := stmtInsertPerson.Exec(
+				resume.fullname, resume.previous, resume.birthday, resume.birthplace, resume.country, resume.snils, resume.inn, resume.education, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+			)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -287,20 +302,22 @@ func excelParse(excelPaths []string) {
 			candId = int(insId)
 
 		} else {
-			_, err := stmtUpdatePerson.Exec(resume.birthday, candId)
+			_, err := stmtUpdatePerson.Exec(
+				time.Now().Truncate(24*time.Hour), candId,
+			)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
 
 		_, err = stmtInsertCheck.Exec(
-			check.bankruptcy, check.bki, check.affiliation, check.internet, check.conclusion, check.deadline, check.pfo, check.officer, candId,
+			check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affiliation, check.internet, check.pfo, check.officer, time.Now().Truncate(24*time.Hour), candId,
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		_, err = stmtInsertRobot.Exec(robot.employee, robot.terrorist, robot.inn, robot.bankruptcy, robot.mvd, robot.courts, robot.bki, candId)
+		_, err = stmtInsertRobot.Exec(robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, robot.bki, time.Now().Truncate(24*time.Hour), candId)
 		if err != nil {
 			log.Fatal(err)
 		}

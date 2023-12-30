@@ -13,15 +13,6 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-type registry struct {
-	id       int
-	fullname string
-	decision string
-	url      string
-	birthday time.Time
-	deadline time.Time
-}
-
 const (
 	workFile = "Кандидаты.xlsm"
 	infoFile = "Запросы по работникам.xlsx"
@@ -80,21 +71,19 @@ func getCurrentPath() (cur string) {
 	return
 }
 
-func getNums(fileName, colName string) []int {
-	f, err := excelize.OpenFile(fileName)
-
+func parseInfoFile() {
+	f, err := excelize.OpenFile(infoPath)
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
 	}
-
 	defer f.Close()
 
 	totalRows, _ := f.GetRows("Лист1")
 	numRows := make([]int, 0, len(totalRows))
 
 	for i := 1; i < len(totalRows); i++ {
-		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", colName, i))
+		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "G", i))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -108,125 +97,136 @@ func getNums(fileName, colName string) []int {
 			}
 		}
 	}
-	return numRows
-}
+	if len(numRows) == 0 {
+		return
+	}
 
-func parseInfoFile() {
-	numRow := getNums(workPath, "G")
+	db, err := sql.Open("sqlite3", databaseURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-	if len(numRow) > 0 {
-		f, err := excelize.OpenFile(infoPath)
+	stmtInsertPerson, err := db.Prepare(
+		"INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertPerson.Close()
+
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET update = ? WHERE id = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtUpdatePerson.Close()
+
+	stmtInsertInquiry, err := db.Prepare(
+		"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES (?, ?, ?, ?)",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmtInsertInquiry.Close()
+
+	for _, num := range numRows {
+		var candId int
+
+		info, err := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
 		if err != nil {
-			log.Fatal(err)
+			info = ""
 		}
-		defer f.Close()
-
-		db, err := sql.Open("sqlite3", databaseURI)
+		initiator, err := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
 		if err != nil {
-			log.Fatal(err)
+			initiator = ""
 		}
-		defer db.Close()
+		fullname, err := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+		if err != nil {
+			fullname = err.Error()
+		}
+		birth, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
+		if err != nil {
+			birth = "02/01/2006"
+		}
+		day, err := time.Parse("02/01/2006", birth)
+		if err != nil {
+			day = time.Now().Truncate(24 * time.Hour)
+		}
+		birthday := day.Local()
+		deadline := time.Now().Truncate(24 * time.Hour)
 
-		stmtInsertPerson, err := db.Prepare(
-			"INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+		row := db.QueryRow(
+			"SELECT id FROM candidates WHERE full_name = ? AND birthday = ?",
+			fullname, birthday,
 		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmtInsertPerson.Close()
 
-		stmtUpdatePerson, err := db.Prepare("UPDATE persons SET update = ? WHERE id = ?")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmtUpdatePerson.Close()
+		err = row.Scan(&candId)
 
-		stmtInsertInquiry, err := db.Prepare(
-			"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES (?, ?, ?, ?)",
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmtInsertInquiry.Close()
-
-		for _, num := range numRow {
-			info, err := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
-			if err != nil {
-				info = ""
-			}
-			initiator, err := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
-			if err != nil {
-				initiator = ""
-			}
-			fullname, err := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
-			if err != nil {
-				fullname = err.Error()
-			}
-			birth, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
-			if err != nil {
-				birth = "02/01/2006"
-			}
-			day, err := time.Parse("02/01/2006", birth)
-			if err != nil {
-				day = time.Now().Truncate(24 * time.Hour)
-			}
-			birthday := day.Local()
-			deadline := time.Now().Truncate(24 * time.Hour)
-
-			row := db.QueryRow(
-				"SELECT full_name, birthday FROM candidates WHERE full_name = ? AND birthday = ?",
-				fullname, birthday,
-			)
-
-			cand := registry{}
-			err = row.Scan(&cand.id, &cand.fullname, &cand.birthday)
-
-			if err == sql.ErrNoRows {
-				result, err := stmtInsertPerson.Exec(
-					cand.fullname, cand.birthday, cand.deadline, 1, 1, 9,
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				id, _ := result.LastInsertId()
-				cand.id = int(id)
-
-			} else if err != nil {
-				log.Fatal(err)
-
-			} else {
-				_, err := stmtUpdatePerson.Exec(
-					deadline, cand.id,
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-
-			_, err = stmtInsertInquiry.Exec(
-				info, initiator, cand.deadline, cand.id,
+		if err == sql.ErrNoRows {
+			result, err := stmtInsertPerson.Exec(
+				fullname, birthday, deadline, 1, 1, 9,
 			)
 			if err != nil {
 				log.Fatal(err)
 			}
+			id, _ := result.LastInsertId()
+			candId = int(id)
+
+		} else if err != nil {
+			log.Fatal(err)
+
+		} else {
+			_, err := stmtUpdatePerson.Exec(
+				deadline, candId,
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		_, err = stmtInsertInquiry.Exec(
+			info, initiator, deadline, candId,
+		)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }
 
 func parseMainFile() {
-	numRow := getNums(workPath, "K")
-	if len(numRow) == 0 {
+	f, err := excelize.OpenFile(workPath)
+
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+
+	defer f.Close()
+
+	totalRows, _ := f.GetRows("Лист1")
+	numRows := make([]int, 0, len(totalRows))
+
+	for i := 1; i < len(totalRows); i++ {
+		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "K", i))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if cell != "" {
+			t, err := time.Parse("02/01/2006", cell)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
+				numRows = append(numRows, i)
+			}
+		}
+	}
+	if len(numRows) == 0 {
 		return
 	}
 
-	f, err := excelize.OpenFile(workFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
 	fio := make([]string, 0)
-	for _, num := range numRow {
+	for _, num := range numRows {
 		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 		if err != nil {
 			cell = ""
@@ -244,7 +244,7 @@ func parseMainFile() {
 	subdir := make([]string, 0)
 	for _, dir := range workDirs {
 		for _, name := range fio {
-			if strings.ToLower(dir.Name()) == strings.ToLower(name) {
+			if strings.EqualFold(dir.Name(), name) {
 				subdir = append(subdir, dir.Name())
 				break
 			}
@@ -277,32 +277,32 @@ func parseMainFile() {
 	if len(excelPath) > 0 {
 		excelParse(excelPath)
 	}
-	// if len(jsonPath) > 0 {
-	// 	jsonParse(jsonPath)
-	// }
-	for _, num := range numRow {
+	if len(jsonPath) > 0 {
+		jsonParse(jsonPath)
+	}
+	for _, num := range numRows {
 		for _, sub := range subdir {
-			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%B%d", num))
+			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 			if err != nil {
 				fmt.Println(err)
 				panic(err)
 			}
 			if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
 
-				id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%A%d", num))
+				id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
 				if err != nil {
 					id = fmt.Sprintf("9999999%d", num)
 				}
 
 				lnk := filepath.Join(archiveDir2, cell[:1], fmt.Sprintf("%s-%s", cell, id))
-				f.SetCellValue("Кандидаты", fmt.Sprintf("%A%d", num), lnk)
+				f.SetCellValue("Кандидаты", fmt.Sprintf("A%d", num), lnk)
 
 				os.Rename(filepath.Join(workDir, sub), lnk)
 			}
 		}
 	}
 
-	screenRegistryData(numRow)
+	screenRegistryData(numRows)
 
 	f.SaveAs(workFile)
 }
@@ -341,6 +341,8 @@ func screenRegistryData(numRow []int) {
 	defer stmtUpdatePerson.Close()
 
 	for _, num := range numRow {
+		var candId int
+
 		decision, err := f.GetCellValue("Кандидаты", fmt.Sprintf("J%d", num))
 		if err != nil {
 			decision = "Согласовано"
@@ -365,11 +367,11 @@ func screenRegistryData(numRow []int) {
 		deadline := time.Now().Truncate(24 * time.Hour)
 
 		row := db.QueryRow(
-			"SELECT id, fullname, birrthday FROM persons WHERE fullname = $1 AND birthday = $2",
+			"SELECT id FROM persons WHERE fullname = $1 AND birthday = $2",
 			fullname, birthday,
 		)
-		cand := registry{}
-		err = row.Scan(&cand.id, &cand.fullname, &cand.birthday, &cand.url)
+
+		err = row.Scan(&candId)
 
 		if err != nil && err != sql.ErrNoRows {
 			log.Println(err)
@@ -394,7 +396,7 @@ func screenRegistryData(numRow []int) {
 			}
 
 		} else {
-			_, err = stmtUpdatePerson.Exec(url, cand.id)
+			_, err = stmtUpdatePerson.Exec(url, candId)
 			if err != nil {
 				log.Fatal(err)
 				return
