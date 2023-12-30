@@ -274,9 +274,9 @@ func parseMainFile() {
 			}
 		}
 	}
-	// if len(excelPath) > 0 {
-	// 	excelParse(excelPath)
-	// }
+	if len(excelPath) > 0 {
+		excelParse(excelPath)
+	}
 	// if len(jsonPath) > 0 {
 	// 	jsonParse(jsonPath)
 	// }
@@ -326,16 +326,19 @@ func screenRegistryData(numRow []int) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer stmtInsertPerson.Close()
 
 	stmtUpdateCheck, err := db.Prepare("UPDATE checks SET conclusion_id = ?, deadline = ? WHERE person_id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer stmtUpdateCheck.Close()
 
 	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer stmtUpdatePerson.Close()
 
 	for _, num := range numRow {
 		decision, err := f.GetCellValue("Кандидаты", fmt.Sprintf("J%d", num))
