@@ -179,7 +179,7 @@ func jsonParse(jsonPaths []string) {
 			return
 		}
 
-		result := stmtSelectPerson.QueryRow(resume.fullname, resume.birthday)
+		result := stmtSelectPerson.QueryRow(person.parseFullname(), person.parseBirthday())
 		err = result.Scan(&candId)
 		if err != nil {
 			log.Fatal(err)

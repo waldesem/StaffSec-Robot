@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 const (
 	workFile = "Кандидаты.xlsm"
 	infoFile = "Запросы по работникам.xlsx"
-	database = "personal.db"
+	database = "persons.db"
 )
 
 var basePath string = filepath.Join(getCurrentPath(), "..")
@@ -25,7 +26,7 @@ var archiveDir string = filepath.Join(basePath, "Персонал")
 var archiveDir2 string = filepath.Join(archiveDir, "Персонал-2")
 var workPath string = filepath.Join(workDir, workFile)
 var infoPath string = filepath.Join(workDir, infoFile)
-var databaseURI string = "sqlite:///" + filepath.Join(basePath, database)
+var databaseURI string = filepath.Join(basePath, database)
 
 func main() {
 	workFileStat, err := os.Stat(workPath)
@@ -33,33 +34,62 @@ func main() {
 		log.Fatal("workFileStat", err)
 	}
 
-	infoFileStat, err := os.Stat(infoPath)
-	if err != nil {
-		log.Fatal("infoFileStat", err)
-	}
+	// infoFileStat, err := os.Stat(infoPath)
+	// if err != nil {
+	// 	log.Fatal("infoFileStat", err)
+	// }
 
 	workFileDate := workFileStat.ModTime().Truncate(24 * time.Hour)
-	infoFileDate := infoFileStat.ModTime().Truncate(24 * time.Hour)
+	// infoFileDate := infoFileStat.ModTime().Truncate(24 * time.Hour)
 	timeNow := time.Now().Truncate(24 * time.Hour)
 
-	if timeNow.Equal(workFileDate) || timeNow.Equal(infoFileDate) {
-		moveFile(databaseURI, filepath.Join(archiveDir, database))
-	}
-	if timeNow.Equal(infoFileDate) {
-		moveFile(infoPath, filepath.Join(archiveDir, infoFile))
-		parseMainFile()
-	}
+	// if timeNow.Equal(workFileDate) || timeNow.Equal(infoFileDate) {
+	// 	err := copyFile(databaseURI, filepath.Join(archiveDir, database))
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// }
+	// if timeNow.Equal(infoFileDate) {
+	// 	err := copyFile(infoPath, filepath.Join(archiveDir, infoFile))
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	parseInfoFile()
+	// }
+
 	if timeNow.Equal(workFileDate) {
-		moveFile(workPath, filepath.Join(archiveDir, workFile))
-		parseInfoFile()
+		// err := copyFile(workPath, filepath.Join(archiveDir, workFile))
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		parseMainFile()
 	}
 }
 
-func moveFile(src, dest string) {
-	err := os.Rename(src, dest)
+func copyFile(src, dest string) error {
+	sourceFile, err := os.Open(src)
 	if err != nil {
-		log.Fatal("moveFile", err)
+		return err
 	}
+	defer sourceFile.Close()
+
+	destinationFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
+
+	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	err = destinationFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getCurrentPath() (cur string) {
@@ -71,150 +101,151 @@ func getCurrentPath() (cur string) {
 	return
 }
 
-func parseInfoFile() {
-	f, err := excelize.OpenFile(infoPath)
-	if err != nil {
-		log.Fatal(err)
-		panic(err)
-	}
-	defer f.Close()
+// func parseInfoFile() {
+// 	f, err := excelize.OpenFile(infoPath)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 		panic(err)
+// 	}
+// 	defer f.Close()
 
-	totalRows, _ := f.GetRows("Лист1")
-	numRows := make([]int, 0, len(totalRows))
+// 	totalRows := 100000 //, _ := f.GetRows("Лист1")
+// 	numRows := make([]int, 0, totalRows)
 
-	for i := 1; i < len(totalRows); i++ {
-		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "G", i))
-		if err != nil {
-			log.Fatal(err)
-		}
-		if cell != "" {
-			t, err := time.Parse("02/01/2006", cell)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
-				numRows = append(numRows, i)
-			}
-		}
-	}
-	if len(numRows) == 0 {
-		return
-	}
+// 	for i := 2; i < totalRows; i++ {
+// 		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "G", i))
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+// 		if cell != "" {
+// 			t, err := time.Parse("02/01/2006", cell)
+// 			if err != nil {
+// 				continue
+// 			}
+// 			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
+// 				numRows = append(numRows, i)
+// 			}
+// 		}
+// 	}
+// 	if len(numRows) == 0 {
+// 		return
+// 	}
 
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+// 	db, err := sql.Open("sqlite3", databaseURI)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer db.Close()
 
-	stmtInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, birthday, create, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertPerson.Close()
+// 	stmtInsertPerson, err := db.Prepare(
+// 		"INSERT INTO persons (fullname, birthday, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+// 	)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer stmtInsertPerson.Close()
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET update = ? WHERE id = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtUpdatePerson.Close()
+// 	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET `update` = ? WHERE id = ?")
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer stmtUpdatePerson.Close()
 
-	stmtInsertInquiry, err := db.Prepare(
-		"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES (?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertInquiry.Close()
+// 	stmtInsertInquiry, err := db.Prepare(
+// 		"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES (?, ?, ?, ?)",
+// 	)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer stmtInsertInquiry.Close()
 
-	for _, num := range numRows {
-		var candId int
+// 	for _, num := range numRows {
+// 		var candId int
 
-		info, err := f.GetCellValue("Лист1", fmt.Sprintf("C%d", num))
-		if err != nil {
-			info = ""
-		}
-		initiator, err := f.GetCellValue("Лист1", fmt.Sprintf("D%d", num))
-		if err != nil {
-			initiator = ""
-		}
-		fullname, err := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
-		if err != nil {
-			fullname = err.Error()
-		}
-		birth, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
-		if err != nil {
-			birth = "02/01/2006"
-		}
-		day, err := time.Parse("02/01/2006", birth)
-		if err != nil {
-			day = time.Now().Truncate(24 * time.Hour)
-		}
-		birthday := day.Local()
-		deadline := time.Now().Truncate(24 * time.Hour)
+// 		info, err := f.GetCellValue("Лист1", fmt.Sprintf("E%d", num))
+// 		if err != nil {
+// 			info = ""
+// 		}
 
-		row := db.QueryRow(
-			"SELECT id FROM candidates WHERE full_name = ? AND birthday = ?",
-			fullname, birthday,
-		)
+// 		initiator, err := f.GetCellValue("Лист1", fmt.Sprintf("F%d", num))
+// 		if err != nil {
+// 			initiator = ""
+// 		}
 
-		err = row.Scan(&candId)
+// 		fullname, err := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+// 		if err != nil {
+// 			fullname = err.Error()
+// 		}
 
-		if err == sql.ErrNoRows {
-			result, err := stmtInsertPerson.Exec(
-				fullname, birthday, deadline, 1, 1, 9,
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			id, _ := result.LastInsertId()
-			candId = int(id)
+// 		birth, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
+// 		if err != nil {
+// 			birth = "02/01/2006"
+// 		}
+// 		day, err := time.Parse("02/01/2006", birth)
+// 		if err != nil {
+// 			day = time.Now().Truncate(24 * time.Hour)
+// 		}
+// 		birthday := day.Local()
 
-		} else if err != nil {
-			log.Fatal(err)
+// 		deadline := time.Now()
 
-		} else {
-			_, err := stmtUpdatePerson.Exec(
-				deadline, candId,
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+// 		row := db.QueryRow(
+// 			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+// 			fullname, birthday,
+// 		)
 
-		_, err = stmtInsertInquiry.Exec(
-			info, initiator, deadline, candId,
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-}
+// 		err = row.Scan(&candId)
+// 		if err == sql.ErrNoRows {
+// 			result, err := stmtInsertPerson.Exec(
+// 				fullname, birthday, deadline, 1, 1, 9,
+// 			)
+// 			if err != nil {
+// 				log.Fatal(err)
+// 			}
+// 			id, _ := result.LastInsertId()
+// 			candId = int(id)
+
+// 		} else if err != nil {
+// 			log.Fatal(err)
+
+// 		} else {
+// 			_, err := stmtUpdatePerson.Exec(
+// 				deadline, candId,
+// 			)
+// 			if err != nil {
+// 				log.Fatal(err)
+// 			}
+// 		}
+
+// 		_, err = stmtInsertInquiry.Exec(
+// 			info, initiator, deadline, candId,
+// 		)
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+// 	}
+// }
 
 func parseMainFile() {
 	f, err := excelize.OpenFile(workPath)
-
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
 	}
-
 	defer f.Close()
 
-	totalRows, _ := f.GetRows("Лист1")
-	numRows := make([]int, 0, len(totalRows))
+	totalRows := 100000 //, _ := f.GetRows("Кандидаты")
+	numRows := make([]int, 0, totalRows)
 
-	for i := 1; i < len(totalRows); i++ {
-		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "K", i))
+	for i := 2; i < totalRows; i++ {
+		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%s%d", "K", i))
 		if err != nil {
 			log.Fatal(err)
 		}
 		if cell != "" {
 			t, err := time.Parse("02/01/2006", cell)
 			if err != nil {
-				log.Fatal(err)
+				continue
 			}
 			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
 				numRows = append(numRows, i)
@@ -229,14 +260,12 @@ func parseMainFile() {
 	for _, num := range numRows {
 		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 		if err != nil {
-			cell = ""
+			continue
 		}
-		if cell != "" {
-			fio = append(fio, strings.TrimSpace(strings.ToLower(cell)))
-		}
+		fio = append(fio, strings.TrimSpace(cell))
 	}
 
-	workDirs, err := os.ReadDir(workPath)
+	workDirs, err := os.ReadDir(workDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -251,11 +280,12 @@ func parseMainFile() {
 		}
 	}
 
-	excelPath := make([]string, 0)
-	jsonPath := make([]string, 0)
+	excelPaths := make([]string, 0)
+	excelFiles := make([]string, 0)
+	jsonPaths := make([]string, 0)
 
 	for _, sub := range subdir {
-		subdirPath := filepath.Join(workPath, sub)
+		subdirPath := filepath.Join(workDir, sub)
 
 		workSubDirs, err := os.ReadDir(subdirPath)
 		if err != nil {
@@ -263,146 +293,122 @@ func parseMainFile() {
 		}
 		for _, file := range workSubDirs {
 			switch {
-			case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")):
-				excelPath = append(excelPath, filepath.Join(subdirPath, file.Name()))
-
-			case strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx"):
-				excelPath = append(excelPath, filepath.Join(subdirPath, file.Name()))
+			case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) && (strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
+				excelPaths = append(excelPaths, subdirPath)
+				excelFiles = append(excelFiles, file.Name())
 
 			case strings.HasSuffix(file.Name(), "json"):
-				jsonPath = append(jsonPath, filepath.Join(subdirPath, file.Name()))
+				jsonPaths = append(jsonPaths, filepath.Join(subdirPath, file.Name()))
 			}
 		}
 	}
-	if len(excelPath) > 0 {
-		excelParse(excelPath)
+	if len(excelPaths) > 0 {
+		excelParse(excelPaths, excelFiles)
 	}
-	if len(jsonPath) > 0 {
-		jsonParse(jsonPath)
-	}
-	for _, num := range numRows {
-		for _, sub := range subdir {
-			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-			if err != nil {
-				fmt.Println(err)
-				panic(err)
-			}
-			if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
+	// if len(jsonPaths) > 0 {
+	// 	jsonParse(jsonPaths)
+	// }
+	// for _, num := range numRows {
+	// 	for _, sub := range subdir {
+	// 		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+	// 		if err != nil {
+	// 			continue
+	// 		}
 
-				id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
-				if err != nil {
-					id = fmt.Sprintf("9999999%d", num)
-				}
+	// 		if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
+	// 			id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
+	// 			if err != nil {
+	// 				id = fmt.Sprintf("9999999%d", num)
+	// 			}
 
-				lnk := filepath.Join(archiveDir2, cell[:1], fmt.Sprintf("%s-%s", cell, id))
-				f.SetCellValue("Кандидаты", fmt.Sprintf("A%d", num), lnk)
+	// 			firstChar := string([]rune(cell)[:1])
+	// 			lnk := filepath.Join(archiveDir2, firstChar, fmt.Sprintf("%s-%s", cell, id))
+	// 			err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
+	// 				Display: &lnk,
+	// 				Tooltip: &cell,
+	// 			})
+	// 			if err != nil {
+	// 				f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
+	// 			}
+	// 			f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+	// 			err = copyFile(filepath.Join(workDir, sub), lnk)
+	// 			if err != nil {
+	// 				log.Fatal(err)
+	// 			}
+	// 		}
+	// 	}
+	// }
 
-				os.Rename(filepath.Join(workDir, sub), lnk)
-			}
-		}
-	}
+	// db, err := sql.Open("sqlite3", databaseURI)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// 	return
+	// }
+	// defer db.Close()
 
-	screenRegistryData(numRows)
+	// stmtInsertPerson, err := db.Prepare(
+	// 	"INSERT INTO persons (fullname, birthday, `create`, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtInsertPerson.Close()
 
-	f.SaveAs(workFile)
-}
+	// stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, `update` = ? WHERE id = ?")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtUpdatePerson.Close()
 
-func screenRegistryData(numRow []int) {
-	f, err := excelize.OpenFile(workPath)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer f.Close()
+	// for _, num := range numRows {
+	// 	var candId int
 
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	defer db.Close()
+	// 	url, err := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+	// 	if err != nil {
+	// 		url = ""
+	// 	}
+	// 	fullname, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+	// 	if err != nil {
+	// 		fullname = err.Error()
+	// 	}
+	// 	birth, err := f.GetCellValue("Кандидаты", fmt.Sprintf("C%d", num))
+	// 	if err != nil {
+	// 		birth = "02/01/2006"
+	// 	}
+	// 	day, err := time.Parse("02/01/2006", birth)
+	// 	if err != nil {
+	// 		day = time.Now().Truncate(24 * time.Hour)
+	// 	}
+	// 	birthday := day.Local()
 
-	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, path) VALUES (?, ?, ?)")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertPerson.Close()
+	// 	row := db.QueryRow(
+	// 		"SELECT id FROM persons WHERE fullname = $1 AND birthday = $2",
+	// 		fullname, birthday,
+	// 	)
 
-	stmtUpdateCheck, err := db.Prepare("UPDATE checks SET conclusion_id = ?, deadline = ? WHERE person_id = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtUpdateCheck.Close()
+	// 	err = row.Scan(&candId)
+	// 	if err != nil && err != sql.ErrNoRows {
+	// 		continue
+	// 	}
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ? WHERE id = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtUpdatePerson.Close()
+	// 	if err == sql.ErrNoRows {
+	// 		result, err := stmtInsertPerson.Exec(fullname, birthday, time.Now(), url, 1, 1, 9)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		id, _ := result.LastInsertId()
+	// 		candId = int(id)
 
-	for _, num := range numRow {
-		var candId int
+	// 	} else {
+	// 		_, err = stmtUpdatePerson.Exec(url, time.Now(), candId)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 			return
+	// 		}
+	// 	}
+	// }
 
-		decision, err := f.GetCellValue("Кандидаты", fmt.Sprintf("J%d", num))
-		if err != nil {
-			decision = "Согласовано"
-		}
-		url, err := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-		if err != nil {
-			url = ""
-		}
-		fullname, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-		if err != nil {
-			fullname = err.Error()
-		}
-		birth, err := f.GetCellValue("Кандидаты", fmt.Sprintf("C%d", num))
-		if err != nil {
-			birth = "02/01/2006"
-		}
-		day, err := time.Parse("02/01/2006", birth)
-		if err != nil {
-			day = time.Now().Truncate(24 * time.Hour)
-		}
-		birthday := day.Local()
-		deadline := time.Now().Truncate(24 * time.Hour)
-
-		row := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname = $1 AND birthday = $2",
-			fullname, birthday,
-		)
-
-		err = row.Scan(&candId)
-
-		if err != nil && err != sql.ErrNoRows {
-			log.Println(err)
-			return
-		}
-
-		if err == sql.ErrNoRows {
-			ins, err := stmtInsertPerson.Exec(fullname, birthday, url)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			insId, err := ins.LastInsertId()
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-			_, err = stmtUpdateCheck.Exec(getConclusionId(decision), deadline, insId)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-
-		} else {
-			_, err = stmtUpdatePerson.Exec(url, candId)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-		}
-	}
+	// f.SaveAs(filepath.Join(workDir, workFile))
 }
 
 func getConclusionId(conclusion string) int {
@@ -416,7 +422,7 @@ func getConclusionId(conclusion string) int {
 
 	row := db.QueryRow(
 		"SELECT id FROM conclusions WHERE LOWER(conclusion) = $1",
-		conclusion,
+		strings.ToLower(conclusion),
 	)
 
 	var id int
