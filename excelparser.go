@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 type Anketa struct {
 	fullname   string
 	previous   string
-	birthday   time.Time
+	birthday   string
 	birthplace string
 	country    string
 	snils      string
@@ -109,23 +108,9 @@ func excelParse(excelPaths []string, excelFiles []string) {
 		var robot Robot
 
 		if strings.HasPrefix(file, "Заключение") {
-			anketa.fullname, err = f.GetCellValue("Лист1", "C6")
-			if err != nil {
-				anketa.fullname = err.Error()
-			}
-			birth, err := f.GetCellValue("Лист1", "C8")
-			if err != nil {
-				birth = "02.01.2006"
-			}
-			day, err := time.Parse("02.01.2006", birth)
-			if err != nil {
-				day = time.Now()
-			}
-			anketa.birthday = day.Truncate(24 * time.Hour)
-			anketa.previous, err = f.GetCellValue("Лист1", "C7")
-			if err != nil {
-				anketa.previous = err.Error()
-			}
+			anketa.fullname = trimmString(parseStringCell(f, "Лист1", "C6"))
+			anketa.birthday = parseDateCell(f, "Лист1", "C8", "02.01.2006")
+			anketa.previous = parseStringCell(f, "Лист1", "C7")
 
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
@@ -134,91 +119,32 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				}
 
 				if fio == "ФИО" {
-					anketa.fullname, err = f.GetCellValue("Лист2", "K3")
-					if err != nil {
-						anketa.fullname = err.Error()
-					}
-					anketa.previous, err = f.GetCellValue("Лист2", "S3")
-					if err != nil {
-						anketa.previous = err.Error()
-					}
-					birth, err := f.GetCellValue("Лист2", "L3")
-					if err != nil {
-						birth = "02.01.2006"
-					}
-					day, err := time.Parse("02.01.2006", birth)
-					if err != nil {
-						day = time.Now()
-					}
-					anketa.birthday = day.Truncate(24 * time.Hour)
-					anketa.birthplace, err = f.GetCellValue("Лист2", "M3")
-					if err != nil {
-						anketa.birthplace = err.Error()
-					}
-					anketa.country, err = f.GetCellValue("Лист2", "T3")
-					if err != nil {
-						anketa.country = err.Error()
-					}
-					anketa.snils, err = f.GetCellValue("Лист2", "U3")
-					if err != nil {
-						anketa.snils = err.Error()
-					}
-					anketa.inn, err = f.GetCellValue("Лист2", "V3")
-					if err != nil {
-						anketa.inn = err.Error()
-					}
-					anketa.education, err = f.GetCellValue("Лист2", "W3")
-					if err != nil {
-						anketa.education = err.Error()
-					}
+					anketa.fullname = trimmString(parseStringCell(f, "Лист2", "K3"))
+					anketa.previous = parseStringCell(f, "Лист2", "S3")
+					anketa.birthday = parseDateCell(f, "Лист2", "L3", "02.01.2006")
+					anketa.birthplace = parseStringCell(f, "Лист2", "M3")
+					anketa.country = parseStringCell(f, "Лист2", "T3")
+					anketa.snils = parseStringCell(f, "Лист2", "U3")
+					anketa.inn = parseStringCell(f, "Лист2", "V3")
+					anketa.education = parseStringCell(f, "Лист2", "W3")
 				}
 			}
 
-			wp1, err := f.GetCellValue("Лист1", "D11")
-			if err != nil {
-				wp1 = ""
-			}
-			wp2, err := f.GetCellValue("Лист1", "D12")
-			if err != nil {
-				wp2 = ""
-			}
-			wp3, err := f.GetCellValue("Лист1", "D13")
-			if err != nil {
-				wp3 = ""
-			}
+			wp1 := parseStringCell(f, "Лист1", "D11")
+			wp2 := parseStringCell(f, "Лист1", "D12")
+			wp3 := parseStringCell(f, "Лист1", "D13")
 			check.workplace = fmt.Sprintf("%s; %s; %s", wp1, wp2, wp3)
-			check.cronos, err = f.GetCellValue("Лист1", "C14")
-			if err != nil {
-				check.cronos = err.Error()
-			}
-			check.cros, err = f.GetCellValue("Лист1", "C16")
-			if err != nil {
-				check.cros = err.Error()
-			}
-			check.document, err = f.GetCellValue("Лист1", "C17")
-			if err != nil {
-				check.document = err.Error()
-			}
-			check.debt, err = f.GetCellValue("Лист1", "C18")
-			if err != nil {
-				check.debt = err.Error()
-			}
-			check.bankruptcy, err = f.GetCellValue("Лист1", "C19")
-			if err != nil {
-				check.bankruptcy = err.Error()
-			}
-			check.bki, err = f.GetCellValue("Лист1", "C20")
-			if err != nil {
-				check.bki = err.Error()
-			}
-			check.affiliation, err = f.GetCellValue("Лист1", "C21")
-			if err != nil {
-				check.affiliation = err.Error()
-			}
-			check.internet, err = f.GetCellValue("Лист1", "C22")
-			if err != nil {
-				check.internet = err.Error()
-			}
+			check.cronos = parseStringCell(f, "Лист1", "C14")
+			check.cros = parseStringCell(f, "Лист1", "C16")
+			check.document = parseStringCell(f, "Лист1", "C17")
+			check.debt = parseStringCell(f, "Лист1", "C18")
+			check.bankruptcy = parseStringCell(f, "Лист1", "C19")
+			check.bki = parseStringCell(f, "Лист1", "C20")
+			check.affiliation = parseStringCell(f, "Лист1", "C21")
+			check.internet = parseStringCell(f, "Лист1", "C22")
+			check.officer = parseStringCell(f, "Лист1", "C25")
+			check.addition = parseStringCell(f, "Лист1", "C28")
+
 			decision, err := f.GetCellValue("Лист1", "C23")
 			if err != nil {
 				decision = "Согласовано"
@@ -234,14 +160,6 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			} else {
 				check.pfo = false
 			}
-			check.officer, err = f.GetCellValue("Лист1", "C25")
-			if err != nil {
-				check.officer = err.Error()
-			}
-			check.addition, err = f.GetCellValue("Лист1", "C28")
-			if err != nil {
-				check.addition = err.Error()
-			}
 
 			result := db.QueryRow(
 				"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
@@ -254,7 +172,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 
 			if err == sql.ErrNoRows {
 				result, err := stmtInsertPerson.Exec(
-					anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+					anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
 				)
 				if err != nil {
 					log.Fatal(err)
@@ -268,7 +186,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			} else {
 				if fio == "" {
 					_, err := stmtUpdatePerson.Exec(
-						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId, candId,
+						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
 						log.Fatal(err)
@@ -285,71 +203,26 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			}
 
 			_, err = stmtInsertCheck.Exec(
-				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affiliation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now().Truncate(24*time.Hour), candId,
+				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affiliation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
 				log.Fatal(err)
 			}
 
 		} else {
-			name, err := f.GetCellValue("Лист1", "B4")
-			if err != nil {
-				anketa.fullname = err.Error()
-			}
-			trimmed := strings.TrimSpace(name)
-			re := regexp.MustCompile(`\s+`)
-			anketa.fullname = re.ReplaceAllString(trimmed, " ")
+			anketa.fullname = trimmString(parseStringCell(f, "Лист1", "B4"))
+			anketa.birthday = parseDateCell(f, "Лист1", "B5", "02.01.2006")
 
-			birth, err := f.GetCellValue("Лист1", "B5")
-			if err != nil {
-				birth = "02.01.2006"
-			}
-			day, err := time.Parse("02.01.2006", birth)
-			if err != nil {
-				day = time.Now()
-			}
-			anketa.birthday = day.Truncate(24 * time.Hour)
-			robot.employee, err = f.GetCellValue("Лист1", "B27")
-			if err != nil {
-				robot.employee = err.Error()
-			}
-			robot.terrorist, err = f.GetCellValue("Лист1", "B17")
-			if err != nil {
-				robot.terrorist = err.Error()
-			}
-			robot.inn, err = f.GetCellValue("Лист1", "B18")
-			if err != nil {
-				robot.inn = err.Error()
-			}
-			bankruptcy1, err := f.GetCellValue("Лист1", "B20")
-			if err != nil {
-				robot.bankruptcy = err.Error()
-			}
-			bankruptcy2, err := f.GetCellValue("Лист1", "B21")
-			if err != nil {
-				robot.bankruptcy = err.Error()
-			}
-			bankruptcy3, err := f.GetCellValue("Лист1", "B22")
-			if err != nil {
-				robot.bankruptcy = err.Error()
-			}
+			robot.employee = parseStringCell(f, "Лист1", "B27")
+			robot.terrorist = parseStringCell(f, "Лист1", "B17")
+			robot.inn = parseStringCell(f, "Лист1", "B18")
+			bankruptcy1 := parseStringCell(f, "Лист1", "B20")
+			bankruptcy2 := parseStringCell(f, "Лист1", "B21")
+			bankruptcy3 := parseStringCell(f, "Лист1", "B22")
 			robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bankruptcy1, bankruptcy2, bankruptcy3)
-			robot.mvd, err = f.GetCellValue("Лист1", "B23")
-			if err != nil {
-				robot.mvd = err.Error()
-			}
-			robot.mvd, err = f.GetCellValue("Лист1", "B23")
-			if err != nil {
-				robot.mvd = err.Error()
-			}
-			robot.courts, err = f.GetCellValue("Лист1", "B24")
-			if err != nil {
-				robot.courts = err.Error()
-			}
-			robot.bki, err = f.GetCellValue("Лист1", "B25")
-			if err != nil {
-				check.bki = err.Error()
-			}
+			robot.mvd = parseStringCell(f, "Лист1", "B23")
+			robot.courts = parseStringCell(f, "Лист1", "B24")
+			robot.bki = parseStringCell(f, "Лист1", "B25")
 
 			result := db.QueryRow(
 				"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
@@ -361,7 +234,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			}
 			if err == sql.ErrNoRows {
 				result, err := stmtShortInsertPerson.Exec(
-					anketa.fullname, anketa.birthday, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
 				)
 				if err != nil {
 					log.Fatal(err)
@@ -381,7 +254,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				}
 			}
 
-			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now().Truncate(24*time.Hour), candId)
+			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
 				log.Fatal(err)
 			}

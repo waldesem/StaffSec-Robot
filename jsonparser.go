@@ -174,13 +174,13 @@ func jsonParse(jsonPaths []string) {
 		}
 
 		result := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
-			person.parseFullname(), person.parseBirthday(),
+			"SELECT id FROM persons WHERE fullname LIKE ? AND birthday = ?",
+			person.parseFullname(), person.Birthday,
 		)
 		err = result.Scan(&candId)
 		if err == sql.ErrNoRows {
 			ins, err := stmtInsertPerson.Exec(
-				person.parseFullname(), person.parsePrevious(), person.parseBirthday(), person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+				person.parseFullname(), person.parsePrevious(), person.Birthday, person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now(), categoryId, regionId, statusId,
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -196,7 +196,7 @@ func jsonParse(jsonPaths []string) {
 
 		} else {
 			_, err := stmtUpdatePerson.Exec(
-				person.parseFullname(), person.parsePrevious(), person.parseBirthday(), person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId, candId,
+				person.parseFullname(), person.parsePrevious(), person.Birthday, person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now(), categoryId, regionId, statusId, candId,
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -252,15 +252,8 @@ func jsonParse(jsonPaths []string) {
 }
 
 func (person Person) parseFullname() string {
-	return fmt.Sprintf("%s %s %s", strings.TrimSpace(person.LastName), strings.TrimSpace(person.FirstName), strings.TrimSpace(person.MidName))
-}
-
-func (person Person) parseBirthday() time.Time {
-	t, err := time.Parse("2006-01-02", person.Birthday)
-	if err != nil {
-		t = time.Now()
-	}
-	return t.Truncate(24 * time.Hour)
+	name := fmt.Sprintf("%s %s %s", person.LastName, person.FirstName, person.MidName)
+	return trimmString(name)
 }
 
 func (person Person) parsePrevious() string {

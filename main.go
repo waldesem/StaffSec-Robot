@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,7 +33,6 @@ var infoPath string = filepath.Join(workDir, infoFile)
 var databaseURI string = filepath.Join(basePath, database)
 
 func main() {
-	startTime := time.Now()
 
 	workFileStat, err := os.Stat(workPath)
 	if err != nil {
@@ -69,7 +69,14 @@ func main() {
 		}
 		parseMainFile()
 	}
-	fmt.Println(time.Since(startTime))
+}
+
+func getCurrentPath() (cur string) {
+	cur, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return
 }
 
 func copyFile(src, dest string) error {
@@ -98,26 +105,13 @@ func copyFile(src, dest string) error {
 	return nil
 }
 
-func getCurrentPath() (cur string) {
-	cur, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return
-}
+func getRowNumbers(f *excelize.File, listName string, collName string) []int {
 
-func parseInfoFile() {
-	f, err := excelize.OpenFile(infoPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	totalRows := 100000 //, _ := f.GetRows("Лист1")
+	totalRows := 100000
 	numRows := make([]int, 0, totalRows)
 
 	for i := 2; i < totalRows; i++ {
-		cell, err := f.GetCellValue("Лист1", fmt.Sprintf("%s%d", "G", i))
+		cell, err := f.GetCellValue(listName, fmt.Sprintf("%s%d", collName, i))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -131,6 +125,43 @@ func parseInfoFile() {
 			}
 		}
 	}
+	return numRows
+}
+
+func parseStringCell(f *excelize.File, listName string, cellName string) string {
+	cell, err := f.GetCellValue(listName, cellName)
+	if err != nil {
+		cell = err.Error()
+	}
+	return cell
+}
+
+func parseDateCell(f *excelize.File, listName string, cellName string, format string) string {
+	cell, err := f.GetCellValue(listName, cellName)
+	if err != nil {
+		cell = format
+	}
+	day, err := time.Parse(format, cell)
+	if err != nil {
+		day = time.Now()
+	}
+	return day.Truncate(24 * time.Hour).Format("2006-01-02")
+}
+
+func trimmString(value string) string {
+	trimmed := strings.TrimSpace(value)
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(trimmed, " ")
+}
+
+func parseInfoFile() {
+	f, err := excelize.OpenFile(infoPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	numRows := getRowNumbers(f, "Лист1", "G")
 	if len(numRows) == 0 {
 		return
 	}
@@ -166,42 +197,21 @@ func parseInfoFile() {
 	for _, num := range numRows {
 		var candId int
 
-		info, err := f.GetCellValue("Лист1", fmt.Sprintf("E%d", num))
-		if err != nil {
-			info = ""
-		}
-
-		initiator, err := f.GetCellValue("Лист1", fmt.Sprintf("F%d", num))
-		if err != nil {
-			initiator = ""
-		}
-
-		fullname, err := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
-		if err != nil {
-			fullname = err.Error()
-		}
-
-		birth, err := f.GetCellValue("Лист1", fmt.Sprintf("B%d", num))
-		if err != nil {
-			birth = "02/01/2006"
-		}
-		day, err := time.Parse("02/01/2006", birth)
-		if err != nil {
-			day = time.Now()
-		}
-		birthday := day.Truncate(24 * time.Hour)
-
+		info := parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num))
+		initiator := parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num))
+		fullname := parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num))
+		birthday := parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num), "02/01/2006")
 		deadline := time.Now()
 
 		row := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+			"SELECT id FROM persons WHERE fullname LIKE ? AND birthday = ?",
 			fullname, birthday,
 		)
 
 		err = row.Scan(&candId)
 		if err == sql.ErrNoRows {
 			result, err := stmtInsertPerson.Exec(
-				fullname, birthday, deadline, 1, 1, 9,
+				fullname, birthday, deadline, categoryId, regionId, statusId,
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -238,24 +248,7 @@ func parseMainFile() {
 	}
 	defer f.Close()
 
-	totalRows := 100000 //, _ := f.GetRows("Кандидаты")
-	numRows := make([]int, 0, totalRows)
-
-	for i := 2; i < totalRows; i++ {
-		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("%s%d", "K", i))
-		if err != nil {
-			log.Fatal(err)
-		}
-		if cell != "" {
-			t, err := time.Parse("02/01/2006", cell)
-			if err != nil {
-				continue
-			}
-			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
-				numRows = append(numRows, i)
-			}
-		}
-	}
+	numRows := getRowNumbers(f, "Кандидаты", "K")
 	if len(numRows) == 0 {
 		return
 	}
@@ -367,26 +360,12 @@ func parseMainFile() {
 	for _, num := range numRows {
 		var candId int
 
-		url, err := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-		if err != nil {
-			url = ""
-		}
-		fullname, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-		if err != nil {
-			fullname = err.Error()
-		}
-		birth, err := f.GetCellValue("Кандидаты", fmt.Sprintf("C%d", num))
-		if err != nil {
-			birth = "02/01/2006"
-		}
-		day, err := time.Parse("02/01/2006", birth)
-		if err != nil {
-			day = time.Now()
-		}
-		birthday := day.Truncate(24 * time.Hour)
+		url := parseStringCell(f, "Кандидаты", fmt.Sprintf("L%d", num))
+		fullname := parseStringCell(f, "Кандидаты", fmt.Sprintf("B%d", num))
+		birthday := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num), "02/01/2006")
 
 		row := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname = $1 AND birthday = $2",
+			"SELECT id FROM persons WHERE fullname LIKE $1 AND birthday = $2",
 			fullname, birthday,
 		)
 
