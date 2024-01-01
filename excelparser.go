@@ -5,17 +5,12 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/xuri/excelize/v2"
-)
-
-const (
-	categoryId = 1
-	statusId   = 9
-	regionId   = 1
 )
 
 type Anketa struct {
@@ -111,7 +106,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 		var fio string
 		var anketa Anketa
 		var check Check
-		// var robot Robot
+		var robot Robot
 
 		if strings.HasPrefix(file, "Заключение") {
 			anketa.fullname, err = f.GetCellValue("Лист1", "C6")
@@ -120,13 +115,13 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			}
 			birth, err := f.GetCellValue("Лист1", "C8")
 			if err != nil {
-				birth = "02/01/2006"
+				birth = "02.01.2006"
 			}
-			day, err := time.Parse("02/01/2006", birth)
+			day, err := time.Parse("02.01.2006", birth)
 			if err != nil {
-				day = time.Now().Truncate(24 * time.Hour)
+				day = time.Now()
 			}
-			anketa.birthday = day
+			anketa.birthday = day.Truncate(24 * time.Hour)
 			anketa.previous, err = f.GetCellValue("Лист1", "C7")
 			if err != nil {
 				anketa.previous = err.Error()
@@ -139,7 +134,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				}
 
 				if fio == "ФИО" {
-					anketa.fullname, err = f.GetCellValue("Лист2", "K2")
+					anketa.fullname, err = f.GetCellValue("Лист2", "K3")
 					if err != nil {
 						anketa.fullname = err.Error()
 					}
@@ -153,9 +148,9 @@ func excelParse(excelPaths []string, excelFiles []string) {
 					}
 					day, err := time.Parse("02.01.2006", birth)
 					if err != nil {
-						day = time.Now().Truncate(24 * time.Hour)
+						day = time.Now()
 					}
-					anketa.birthday = day
+					anketa.birthday = day.Truncate(24 * time.Hour)
 					anketa.birthplace, err = f.GetCellValue("Лист2", "M3")
 					if err != nil {
 						anketa.birthplace = err.Error()
@@ -296,97 +291,100 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				log.Fatal(err)
 			}
 
-			// } else {
-			// 	anketa.fullname, err = f.GetCellValue("Лист1", "B4")
-			// 	if err != nil {
-			// 		anketa.fullname = err.Error()
-			// 	}
-			// 	birth, err := f.GetCellValue("Лист1", "L3")
-			// 	if err != nil {
-			// 		birth = "02/01/2006"
-			// 	}
-			// 	day, err := time.Parse("02/01/2006", birth)
-			// 	if err != nil {
-			// 		day = time.Now().Truncate(24 * time.Hour)
-			// 	}
-			// 	anketa.birthday = day
+		} else {
+			name, err := f.GetCellValue("Лист1", "B4")
+			if err != nil {
+				anketa.fullname = err.Error()
+			}
+			trimmed := strings.TrimSpace(name)
+			re := regexp.MustCompile(`\s+`)
+			anketa.fullname = re.ReplaceAllString(trimmed, " ")
 
-			// 	robot.employee, err = f.GetCellValue("Лист1", "B27")
-			// 	if err != nil {
-			// 		robot.employee = err.Error()
-			// 	}
-			// 	robot.terrorist, err = f.GetCellValue("Лист1", "B17")
-			// 	if err != nil {
-			// 		robot.terrorist = err.Error()
-			// 	}
-			// 	robot.inn, err = f.GetCellValue("Лист1", "B18")
-			// 	if err != nil {
-			// 		robot.inn = err.Error()
-			// 	}
-			// 	bankruptcy1, err := f.GetCellValue("Лист1", "B20")
-			// 	if err != nil {
-			// 		robot.bankruptcy = err.Error()
-			// 	}
-			// 	bankruptcy2, err := f.GetCellValue("Лист1", "B21")
-			// 	if err != nil {
-			// 		robot.bankruptcy = err.Error()
-			// 	}
-			// 	bankruptcy3, err := f.GetCellValue("Лист1", "B22")
-			// 	if err != nil {
-			// 		robot.bankruptcy = err.Error()
-			// 	}
-			// 	robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bankruptcy1, bankruptcy2, bankruptcy3)
-			// 	robot.mvd, err = f.GetCellValue("Лист1", "B23")
-			// 	if err != nil {
-			// 		robot.mvd = err.Error()
-			// 	}
-			// 	robot.mvd, err = f.GetCellValue("Лист1", "B23")
-			// 	if err != nil {
-			// 		robot.mvd = err.Error()
-			// 	}
-			// 	robot.courts, err = f.GetCellValue("Лист1", "B24")
-			// 	if err != nil {
-			// 		robot.courts = err.Error()
-			// 	}
-			// 	robot.bki, err = f.GetCellValue("Лист1", "B25")
-			// 	if err != nil {
-			// 		check.bki = err.Error()
-			// 	}
+			birth, err := f.GetCellValue("Лист1", "B5")
+			if err != nil {
+				birth = "02.01.2006"
+			}
+			day, err := time.Parse("02.01.2006", birth)
+			if err != nil {
+				day = time.Now()
+			}
+			anketa.birthday = day.Truncate(24 * time.Hour)
+			robot.employee, err = f.GetCellValue("Лист1", "B27")
+			if err != nil {
+				robot.employee = err.Error()
+			}
+			robot.terrorist, err = f.GetCellValue("Лист1", "B17")
+			if err != nil {
+				robot.terrorist = err.Error()
+			}
+			robot.inn, err = f.GetCellValue("Лист1", "B18")
+			if err != nil {
+				robot.inn = err.Error()
+			}
+			bankruptcy1, err := f.GetCellValue("Лист1", "B20")
+			if err != nil {
+				robot.bankruptcy = err.Error()
+			}
+			bankruptcy2, err := f.GetCellValue("Лист1", "B21")
+			if err != nil {
+				robot.bankruptcy = err.Error()
+			}
+			bankruptcy3, err := f.GetCellValue("Лист1", "B22")
+			if err != nil {
+				robot.bankruptcy = err.Error()
+			}
+			robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bankruptcy1, bankruptcy2, bankruptcy3)
+			robot.mvd, err = f.GetCellValue("Лист1", "B23")
+			if err != nil {
+				robot.mvd = err.Error()
+			}
+			robot.mvd, err = f.GetCellValue("Лист1", "B23")
+			if err != nil {
+				robot.mvd = err.Error()
+			}
+			robot.courts, err = f.GetCellValue("Лист1", "B24")
+			if err != nil {
+				robot.courts = err.Error()
+			}
+			robot.bki, err = f.GetCellValue("Лист1", "B25")
+			if err != nil {
+				check.bki = err.Error()
+			}
 
-			// 	result := db.QueryRow(
-			// 		"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
-			// 		anketa.fullname, anketa.birthday,
-			// 	)
-			// 	err = result.Scan(&candId)
-			// 	if err != nil && err != sql.ErrNoRows {
-			// 		candId = 0
-			// 	}
-			// 	if err == sql.ErrNoRows {
-			// 		result, err := stmtShortInsertPerson.Exec(
-			// 			anketa.fullname, anketa.birthday, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
-			// 		)
-			// 		if err != nil {
-			// 			log.Fatal(err)
-			// 		}
-			// 		id, err := result.LastInsertId()
-			// 		if err != nil {
-			// 			log.Fatal(err)
-			// 		}
-			// 		candId = int(id)
+			result := db.QueryRow(
+				"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+				anketa.fullname, anketa.birthday,
+			)
+			err = result.Scan(&candId)
+			if err != nil && err != sql.ErrNoRows {
+				candId = 0
+			}
+			if err == sql.ErrNoRows {
+				result, err := stmtShortInsertPerson.Exec(
+					anketa.fullname, anketa.birthday, time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
+				)
+				if err != nil {
+					log.Fatal(err)
+				}
+				id, err := result.LastInsertId()
+				if err != nil {
+					log.Fatal(err)
+				}
+				candId = int(id)
 
-			// 	} else {
-			// 		_, err := stmtShortUpdatePerson.Exec(
-			// 			anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
-			// 		)
-			// 		if err != nil {
-			// 			log.Fatal(err)
-			// 		}
-			// 	}
+			} else {
+				_, err := stmtShortUpdatePerson.Exec(
+					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
+				)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 
-			// 	_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now().Truncate(24*time.Hour), candId)
-			// 	if err != nil {
-			// 		log.Fatal(err)
-			// 	}
+			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now().Truncate(24*time.Hour), candId)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 }

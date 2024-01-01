@@ -103,19 +103,13 @@ func jsonParse(jsonPaths []string) {
 	}
 	defer db.Close()
 
-	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtSelectPerson.Close()
-
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, create = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, `update` = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
-	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, update, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, ext_country, snils, inn, marital, education, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,19 +133,19 @@ func jsonParse(jsonPaths []string) {
 	}
 	defer stmtInsertAddress.Close()
 
-	stmtInsertContacts, err := db.Prepare("INSERT INTO contacts (view, contact, person_id) VALUES (?, ?, ?, ?)")
+	stmtInsertContacts, err := db.Prepare("INSERT INTO contacts (view, contact, person_id) VALUES (?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertContacts.Close()
 
-	stmtInsertAffiliation, err := db.Prepare("INSERT INTO affiliations (view, name, inn, position, person_id) VALUES (?, ?, ?, ?, ?)")
+	stmtInsertAffiliation, err := db.Prepare("INSERT INTO affilations (view, name, inn, position, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertAffiliation.Close()
 
-	stmtInsertWorkplace, err := db.Prepare("INSERT INTO workplaces (start_date, end_date, position, organization, reason, person_id) VALUES (?, ?, ?, ?, ?, ?)")
+	stmtInsertWorkplace, err := db.Prepare("INSERT INTO workplaces (start_date, end_date, workplace, address, position, reason, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -179,13 +173,12 @@ func jsonParse(jsonPaths []string) {
 			return
 		}
 
-		result := stmtSelectPerson.QueryRow(person.parseFullname(), person.parseBirthday())
+		result := db.QueryRow(
+			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+			person.parseFullname(), person.parseBirthday(),
+		)
 		err = result.Scan(&candId)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if candId == 0 {
+		if err == sql.ErrNoRows {
 			ins, err := stmtInsertPerson.Exec(
 				person.parseFullname(), person.parsePrevious(), person.parseBirthday(), person.Birthplace, person.Citizen, person.AdditionalCitizenship, person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(), time.Now().Truncate(24*time.Hour), categoryId, regionId, statusId,
 			)
@@ -197,6 +190,9 @@ func jsonParse(jsonPaths []string) {
 				log.Fatal(err)
 			}
 			candId = int(insId)
+
+		} else if err != nil {
+			log.Fatal(err)
 
 		} else {
 			_, err := stmtUpdatePerson.Exec(
@@ -212,7 +208,7 @@ func jsonParse(jsonPaths []string) {
 			log.Fatal(err)
 		}
 
-		_, err = stmtInsertDocument.Exec(person.PassportSerial, person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, person.PassportIssuedBy, candId)
+		_, err = stmtInsertDocument.Exec("Паспорт", person.PassportSerial, person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, candId)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -238,7 +234,7 @@ func jsonParse(jsonPaths []string) {
 		}
 
 		for _, item := range person.parseAffilation() {
-			_, err = stmtInsertAffiliation.Exec(item.View, item.Inn, item.Position, item.Name, candId)
+			_, err = stmtInsertAffiliation.Exec(item.View, item.Name, item.Inn, item.Position, time.Now(), candId)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -246,7 +242,7 @@ func jsonParse(jsonPaths []string) {
 
 		for _, item := range person.parseWorkplace() {
 			_, err = stmtInsertWorkplace.Exec(
-				item.BeginDate, item.EndDate, item.Name, item.Position, item.FireReason, candId)
+				item.BeginDate, item.EndDate, item.Name, item.Address, item.Position, item.FireReason, candId)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -256,15 +252,15 @@ func jsonParse(jsonPaths []string) {
 }
 
 func (person Person) parseFullname() string {
-	return fmt.Sprintf("%s %s %s", person.LastName, person.FirstName, person.MidName)
+	return fmt.Sprintf("%s %s %s", strings.TrimSpace(person.LastName), strings.TrimSpace(person.FirstName), strings.TrimSpace(person.MidName))
 }
 
 func (person Person) parseBirthday() time.Time {
 	t, err := time.Parse("2006-01-02", person.Birthday)
 	if err != nil {
-		log.Fatal(err)
+		t = time.Now()
 	}
-	return t
+	return t.Truncate(24 * time.Hour)
 }
 
 func (person Person) parsePrevious() string {
