@@ -174,7 +174,7 @@ func jsonParse(done chan bool, jsonPaths []string) {
 		}
 
 		result := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname LIKE ? AND birthday = ?",
+			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
 			person.parseFullname(), person.Birthday,
 		)
 		err = result.Scan(&candId)

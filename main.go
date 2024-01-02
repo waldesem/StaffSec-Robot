@@ -218,7 +218,7 @@ func parseInfoFile(done chan bool) {
 		deadline := time.Now()
 
 		row := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname LIKE ? AND birthday = ?",
+			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
 			fullname, birthday,
 		)
 
@@ -391,7 +391,7 @@ func parseMainFile(done chan bool) {
 		birthday := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num), "02/01/2006")
 
 		row := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname LIKE $1 AND birthday = $2",
+			"SELECT id FROM persons WHERE fullname = $1 AND birthday = $2",
 			fullname, birthday,
 		)
 
