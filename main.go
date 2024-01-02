@@ -33,6 +33,7 @@ var infoPath string = filepath.Join(workDir, infoFile)
 var databaseURI string = filepath.Join(basePath, database)
 
 func main() {
+	now := time.Now()
 
 	workFileStat, err := os.Stat(workPath)
 	if err != nil {
@@ -48,6 +49,9 @@ func main() {
 	workFileDate := workFileStat.ModTime().Truncate(24 * time.Hour)
 	infoFileDate := infoFileStat.ModTime().Truncate(24 * time.Hour)
 
+	infoFileDone := make(chan bool)
+	mainFileDone := make(chan bool)
+
 	if timeNow.Equal(workFileDate) || timeNow.Equal(infoFileDate) {
 		err := copyFile(databaseURI, filepath.Join(archiveDir, database))
 		if err != nil {
@@ -59,7 +63,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		parseInfoFile()
+		go parseInfoFile(infoFileDone)
 	}
 
 	if timeNow.Equal(workFileDate) {
@@ -67,8 +71,18 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		parseMainFile()
+		go parseMainFile(mainFileDone)
 	}
+
+	if timeNow.Equal(workFileDate) {
+		<-mainFileDone
+	}
+
+	if timeNow.Equal(infoFileDate) {
+		<-infoFileDone
+	}
+
+	fmt.Printf("Total time: %s\n", time.Since(now))
 }
 
 func getCurrentPath() (cur string) {
@@ -154,7 +168,7 @@ func trimmString(value string) string {
 	return re.ReplaceAllString(trimmed, " ")
 }
 
-func parseInfoFile() {
+func parseInfoFile(done chan bool) {
 	f, err := excelize.OpenFile(infoPath)
 	if err != nil {
 		log.Fatal(err)
@@ -173,14 +187,14 @@ func parseInfoFile() {
 	defer db.Close()
 
 	stmtInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, birthday, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+		"INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET `update` = ? WHERE id = ?")
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET updated = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -238,9 +252,10 @@ func parseInfoFile() {
 			log.Fatal(err)
 		}
 	}
+	done <- true
 }
 
-func parseMainFile() {
+func parseMainFile(done chan bool) {
 	f, err := excelize.OpenFile(workPath)
 	if err != nil {
 		log.Fatal(err)
@@ -299,12 +314,23 @@ func parseMainFile() {
 			}
 		}
 	}
+	excelPathDone := make(chan bool)
+	jsonPathDone := make(chan bool)
+
 	if len(excelPaths) > 0 {
-		excelParse(excelPaths, excelFiles)
+		go excelParse(excelPathDone, excelPaths, excelFiles)
 	}
 	if len(jsonPaths) > 0 {
-		jsonParse(jsonPaths)
+		go jsonParse(jsonPathDone, jsonPaths)
 	}
+
+	if len(excelPaths) > 0 {
+		<-excelPathDone
+	}
+	if len(jsonPaths) > 0 {
+		<-jsonPathDone
+	}
+
 	for _, num := range numRows {
 		for _, sub := range subdir {
 			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
@@ -344,14 +370,14 @@ func parseMainFile() {
 	defer db.Close()
 
 	stmtInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, birthday, `create`, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, `update` = ? WHERE id = ?")
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, updated = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -392,6 +418,7 @@ func parseMainFile() {
 	}
 
 	f.SaveAs(filepath.Join(workDir, workFile))
+	done <- true
 }
 
 func getConclusionId(conclusion string) int {

@@ -24,20 +24,20 @@ type Anketa struct {
 }
 
 type Check struct {
-	workplace   string
-	cronos      string
-	cros        string
-	document    string
-	debt        string
-	bankruptcy  string
-	bki         string
-	affiliation string
-	internet    string
-	pfo         bool
-	addition    string
-	conclusion  int
-	officer     string
-	deadline    time.Time
+	workplace  string
+	cronos     string
+	cros       string
+	document   string
+	debt       string
+	bankruptcy string
+	bki        string
+	affilation string
+	internet   string
+	pfo        bool
+	addition   string
+	conclusion int
+	officer    string
+	deadline   time.Time
 }
 
 type Robot struct {
@@ -50,7 +50,7 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(excelPaths []string, excelFiles []string) {
+func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
@@ -58,31 +58,31 @@ func excelParse(excelPaths []string, excelFiles []string) {
 	}
 	defer db.Close()
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, `update` = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
-	stmtShortUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, birthday = ?, `update` = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
+	stmtShortUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
-	stmtShortInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)")
+	stmtShortInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtShortInsertPerson.Close()
 
-	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
-	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affiliation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			check.debt = parseStringCell(f, "Лист1", "C18")
 			check.bankruptcy = parseStringCell(f, "Лист1", "C19")
 			check.bki = parseStringCell(f, "Лист1", "C20")
-			check.affiliation = parseStringCell(f, "Лист1", "C21")
+			check.affilation = parseStringCell(f, "Лист1", "C21")
 			check.internet = parseStringCell(f, "Лист1", "C22")
 			check.officer = parseStringCell(f, "Лист1", "C25")
 			check.addition = parseStringCell(f, "Лист1", "C28")
@@ -203,7 +203,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			}
 
 			_, err = stmtInsertCheck.Exec(
-				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affiliation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
+				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affilation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -260,4 +260,5 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			}
 		}
 	}
+	done <- true
 }

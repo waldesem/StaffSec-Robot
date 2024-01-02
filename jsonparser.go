@@ -95,7 +95,7 @@ type Person struct {
 	Organizations                     []Organization `json:"organizations"`
 }
 
-func jsonParse(jsonPaths []string) {
+func jsonParse(done chan bool, jsonPaths []string) {
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
@@ -103,13 +103,13 @@ func jsonParse(jsonPaths []string) {
 	}
 	defer db.Close()
 
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, `update` = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
+	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
-	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, ext_country, snils, inn, marital, education, `create`, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, ext_country, snils, inn, marital, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -249,6 +249,7 @@ func jsonParse(jsonPaths []string) {
 
 		}
 	}
+	done <- true
 }
 
 func (person Person) parseFullname() string {
