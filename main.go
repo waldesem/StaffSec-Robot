@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -375,7 +376,7 @@ func copyDir(src string, dest string) error {
 		return err
 	}
 
-	err = filepath.Walk(src, func(path string, info os.FileInfo, walkErr error) error {
+	err = filepath.WalkDir(src, func(path string, d fs.DirEntry, walkErr error) error {
 		if path == src {
 			return nil
 		}
@@ -386,7 +387,7 @@ func copyDir(src string, dest string) error {
 		}
 		destPath := filepath.Join(dest, relativePath)
 
-		if !info.IsDir() {
+		if !d.IsDir() {
 			err = copyFile(path, destPath)
 			if err != nil {
 				return err
