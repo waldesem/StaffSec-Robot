@@ -108,7 +108,7 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 		var robot Robot
 
 		if strings.HasPrefix(file, "Заключение") {
-			anketa.fullname = trimmString(parseStringCell(f, "Лист1", "C6"))
+			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "C6")))
 			anketa.birthday = parseDateCell(f, "Лист1", "C8", "02.01.2006")
 			anketa.previous = parseStringCell(f, "Лист1", "C7")
 
@@ -119,7 +119,7 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 				}
 
 				if fio == "ФИО" {
-					anketa.fullname = trimmString(parseStringCell(f, "Лист2", "K3"))
+					anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист2", "K3")))
 					anketa.previous = parseStringCell(f, "Лист2", "S3")
 					anketa.birthday = parseDateCell(f, "Лист2", "L3", "02.01.2006")
 					anketa.birthplace = parseStringCell(f, "Лист2", "M3")
@@ -210,7 +210,7 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 			}
 
 		} else {
-			anketa.fullname = trimmString(parseStringCell(f, "Лист1", "B4"))
+			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "B4")))
 			anketa.birthday = parseDateCell(f, "Лист1", "B5", "02.01.2006")
 
 			robot.employee = parseStringCell(f, "Лист1", "B27")

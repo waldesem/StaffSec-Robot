@@ -254,7 +254,7 @@ func jsonParse(done chan bool, jsonPaths []string) {
 
 func (person Person) parseFullname() string {
 	name := fmt.Sprintf("%s %s %s", person.LastName, person.FirstName, person.MidName)
-	return trimmString(name)
+	return strings.ToTitle(trimmString(name))
 }
 
 func (person Person) parsePrevious() string {
