@@ -73,17 +73,6 @@ func main() {
 }
 
 func parseInfoFile() {
-	f, err := excelize.OpenFile(infoPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	numRows := getRowNumbers(f, "Лист1", "G")
-	if len(numRows) == 0 {
-		return
-	}
-
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
@@ -118,48 +107,59 @@ func parseInfoFile() {
 	}
 	defer stmtInsertInquiry.Close()
 
-	for _, num := range numRows {
-		var candId int
+	f, err := excelize.OpenFile(infoPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
 
-		info := parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num))
-		initiator := parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num))
-		fullname := strings.ToUpper(parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num)))
-		birthday := parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num), "02/01/2006")
-		deadline := time.Now()
+	numRows := getRowNumbers(f, "Лист1", "G")
+	if len(numRows) > 0 {
+		for _, num := range numRows {
+			var candId int
 
-		row := stmtSelectPerson.QueryRow(fullname, birthday)
-		err = row.Scan(&candId)
+			info := parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num))
+			initiator := parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num))
+			fullname := strings.ToUpper(parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num)))
+			birthday := parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num), "02/01/2006")
+			deadline := time.Now()
 
-		if err == sql.ErrNoRows {
-			result, err := stmtInsertPerson.Exec(
-				fullname, birthday, deadline, categoryId, regionId, statusId,
+			row := stmtSelectPerson.QueryRow(fullname, birthday)
+			err = row.Scan(&candId)
+
+			if err != nil {
+				if err == sql.ErrNoRows {
+					result, err := stmtInsertPerson.Exec(
+						fullname, birthday, deadline, categoryId, regionId, statusId,
+					)
+					if err != nil {
+						log.Fatal(err)
+					}
+					id, err := result.LastInsertId()
+					if err != nil {
+						log.Fatal(err)
+					}
+					candId = int(id)
+
+				} else {
+					log.Fatal(err)
+				}
+
+			} else {
+				_, err := stmtUpdatePerson.Exec(
+					deadline, candId,
+				)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+
+			_, err = stmtInsertInquiry.Exec(
+				info, initiator, deadline, candId,
 			)
 			if err != nil {
 				log.Fatal(err)
 			}
-			id, err := result.LastInsertId()
-			if err != nil {
-				id = 0
-			}
-			candId = int(id)
-
-		} else if err != nil {
-			log.Fatal(err)
-
-		} else {
-			_, err := stmtUpdatePerson.Exec(
-				deadline, candId,
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		_, err = stmtInsertInquiry.Exec(
-			info, initiator, deadline, candId,
-		)
-		if err != nil {
-			log.Fatal(err)
 		}
 	}
 }
@@ -172,169 +172,173 @@ func parseMainFile() {
 	defer f.Close()
 
 	numRows := getRowNumbers(f, "Кандидаты", "K")
-	if len(numRows) == 0 {
-		return
-	}
 
-	fio := make([]string, 0)
-	for _, num := range numRows {
-		cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-		if err != nil {
-			continue
-		}
-		fio = append(fio, strings.TrimSpace(cell))
-	}
-
-	workDirs, err := os.ReadDir(workDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	subdir := make([]string, 0)
-	for _, dir := range workDirs {
-		for _, name := range fio {
-			if strings.EqualFold(dir.Name(), name) {
-				subdir = append(subdir, dir.Name())
-				break
+	if len(numRows) != 0 {
+		fio := make([]string, 0)
+		for _, num := range numRows {
+			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+			if err != nil {
+				fmt.Println(err)
+				continue
 			}
+			fio = append(fio, strings.TrimSpace(cell))
 		}
-	}
 
-	excelPaths := make([]string, 0)
-	excelFiles := make([]string, 0)
-	jsonPaths := make([]string, 0)
-
-	for _, sub := range subdir {
-		subdirPath := filepath.Join(workDir, sub)
-
-		workSubDirs, err := os.ReadDir(subdirPath)
+		workDirs, err := os.ReadDir(workDir)
 		if err != nil {
 			log.Fatal(err)
 		}
-		for _, file := range workSubDirs {
-			switch {
-			case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
-				(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
-				excelPaths = append(excelPaths, subdirPath)
-				excelFiles = append(excelFiles, file.Name())
 
-			case strings.HasSuffix(file.Name(), "json"):
-				jsonPaths = append(jsonPaths, filepath.Join(subdirPath, file.Name()))
+		subdir := make([]string, 0)
+		for _, dir := range workDirs {
+			for _, name := range fio {
+				if strings.EqualFold(dir.Name(), name) {
+					subdir = append(subdir, dir.Name())
+					break
+				}
 			}
 		}
-	}
 
-	excelPathDone := make(chan bool)
-	if len(excelPaths) > 0 {
-		go excelParse(excelPathDone, excelPaths, excelFiles)
-	}
+		excelPaths := make([]string, 0)
+		excelFiles := make([]string, 0)
+		jsonPaths := make([]string, 0)
 
-	jsonPathDone := make(chan bool)
-	if len(jsonPaths) > 0 {
-		go jsonParse(jsonPathDone, jsonPaths)
-	}
-
-	if len(excelPaths) > 0 {
-		<-excelPathDone
-	}
-	if len(jsonPaths) > 0 {
-		<-jsonPathDone
-	}
-
-	for _, num := range numRows {
 		for _, sub := range subdir {
-			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+			subdirPath := filepath.Join(workDir, sub)
+
+			workSubDirs, err := os.ReadDir(subdirPath)
 			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			for _, file := range workSubDirs {
+				switch {
+				case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
+					(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
+					excelPaths = append(excelPaths, subdirPath)
+					excelFiles = append(excelFiles, file.Name())
+
+				case strings.HasSuffix(file.Name(), "json"):
+					jsonPaths = append(jsonPaths, filepath.Join(subdirPath, file.Name()))
+				}
+			}
+		}
+
+		excelPathDone := make(chan bool)
+		if len(excelPaths) > 0 {
+			go excelParse(excelPathDone, excelPaths, excelFiles)
+		}
+
+		jsonPathDone := make(chan bool)
+		if len(jsonPaths) > 0 {
+			go jsonParse(jsonPathDone, jsonPaths)
+		}
+
+		if len(excelPaths) > 0 {
+			<-excelPathDone
+		}
+		if len(jsonPaths) > 0 {
+			<-jsonPathDone
+		}
+
+		for _, num := range numRows {
+			for _, sub := range subdir {
+				cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
+					id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
+					if err != nil {
+						id = fmt.Sprintf("999%d", num)
+					}
+
+					firstChar := string([]rune(cell)[:1])
+					lnk := filepath.Join(archiveDir2, firstChar, fmt.Sprintf("%s-%s", cell, id))
+					err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
+						Display: &lnk,
+						Tooltip: &cell,
+					})
+					if err != nil {
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
+					}
+					f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+					subPath := filepath.Join(workDir, sub)
+					err = copyDir(subPath, lnk)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					err = os.RemoveAll(subPath)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+				}
+			}
+		}
+
+		db, err := sql.Open("sqlite3", databaseURI)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
+
+		stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmtSelectPerson.Close()
+
+		stmtInsertPerson, err := db.Prepare(
+			"INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmtInsertPerson.Close()
+
+		stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, updated = ? WHERE id = ?")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmtUpdatePerson.Close()
+
+		for _, num := range numRows {
+			var candId int
+
+			url := parseStringCell(f, "Кандидаты", fmt.Sprintf("L%d", num))
+			fullname := strings.ToTitle(parseStringCell(f, "Кандидаты", fmt.Sprintf("B%d", num)))
+			birthday := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num), "02/01/2006")
+
+			row := stmtSelectPerson.QueryRow(fullname, birthday)
+			err = row.Scan(&candId)
+			if err != nil && err != sql.ErrNoRows {
+				fmt.Println(err)
 				continue
 			}
 
-			if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
-				id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
-				if err != nil {
-					id = fmt.Sprintf("9999999%d", num)
-				}
-
-				firstChar := string([]rune(cell)[:1])
-				lnk := filepath.Join(archiveDir2, firstChar, fmt.Sprintf("%s-%s", cell, id))
-				err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
-					Display: &lnk,
-					Tooltip: &cell,
-				})
-				if err != nil {
-					f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
-				}
-				f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
-				subPath := filepath.Join(workDir, sub)
-				err = copyDir(subPath, lnk)
+			if err == sql.ErrNoRows {
+				result, err := stmtInsertPerson.Exec(fullname, birthday, time.Now(), url, categoryId, regionId, statusId)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
-				err = os.RemoveAll(subPath)
+				id, _ := result.LastInsertId()
+				candId = int(id)
+
+			} else {
+				_, err = stmtUpdatePerson.Exec(url, time.Now(), candId)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
 			}
 		}
+		f.SaveAs(filepath.Join(workDir, workFile))
 	}
-
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtSelectPerson.Close()
-
-	stmtInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertPerson.Close()
-
-	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, updated = ? WHERE id = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtUpdatePerson.Close()
-
-	for _, num := range numRows {
-		var candId int
-
-		url := parseStringCell(f, "Кандидаты", fmt.Sprintf("L%d", num))
-		fullname := strings.ToTitle(parseStringCell(f, "Кандидаты", fmt.Sprintf("B%d", num)))
-		birthday := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num), "02/01/2006")
-
-		row := stmtSelectPerson.QueryRow(fullname, birthday)
-		err = row.Scan(&candId)
-		if err != nil && err != sql.ErrNoRows {
-			continue
-		}
-
-		if err == sql.ErrNoRows {
-			result, err := stmtInsertPerson.Exec(fullname, birthday, time.Now(), url, categoryId, regionId, statusId)
-			if err != nil {
-				log.Fatal(err)
-			}
-			id, _ := result.LastInsertId()
-			candId = int(id)
-
-		} else {
-			_, err = stmtUpdatePerson.Exec(url, time.Now(), candId)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-		}
-	}
-	f.SaveAs(filepath.Join(workDir, workFile))
 }
 
 func getCurrentPath() (cur string) {
@@ -406,11 +410,13 @@ func getRowNumbers(f *excelize.File, listName string, collName string) []int {
 	for i := 2; i < totalRows; i++ {
 		cell, err := f.GetCellValue(listName, fmt.Sprintf("%s%d", collName, i))
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			continue
 		}
 		if cell != "" {
 			t, err := time.Parse("02/01/2006", cell)
 			if err != nil {
+				fmt.Println(err)
 				continue
 			}
 			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {

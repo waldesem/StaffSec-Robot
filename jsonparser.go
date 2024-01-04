@@ -99,7 +99,6 @@ func jsonParse(done chan bool, jsonPaths []string) {
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 	defer db.Close()
 
@@ -170,7 +169,8 @@ func jsonParse(done chan bool, jsonPaths []string) {
 	for _, path := range jsonPaths {
 		f, err := os.Open(path)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 		defer f.Close()
 
@@ -179,14 +179,14 @@ func jsonParse(done chan bool, jsonPaths []string) {
 
 		jsonData, err := io.ReadAll(f)
 		if err != nil {
-			log.Fatal(err)
-			return
+			log.Println(err)
+			continue
 		}
 
 		err = json.Unmarshal(jsonData, &person)
 		if err != nil {
-			log.Fatal(err)
-			return
+			log.Println(err)
+			continue
 		}
 
 		result := db.QueryRow(
@@ -194,24 +194,29 @@ func jsonParse(done chan bool, jsonPaths []string) {
 			person.parseFullname(), person.Birthday,
 		)
 		err = result.Scan(&candId)
-		if err == sql.ErrNoRows {
-			ins, err := stmtInsertPerson.Exec(
-				person.parseFullname(), person.parsePrevious(), person.Birthday,
-				person.Birthplace, person.Citizen, person.AdditionalCitizenship,
-				person.Snils, person.Inn, person.MaritalStatus,
-				person.parseEducation(), time.Now(), categoryId, regionId, statusId,
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			insId, err := ins.LastInsertId()
-			if err != nil {
-				log.Fatal(err)
-			}
-			candId = int(insId)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				ins, err := stmtInsertPerson.Exec(
+					person.parseFullname(), person.parsePrevious(), person.Birthday,
+					person.Birthplace, person.Citizen, person.AdditionalCitizenship,
+					person.Snils, person.Inn, person.MaritalStatus,
+					person.parseEducation(), time.Now(), categoryId, regionId, statusId,
+				)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				id, err := ins.LastInsertId()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				candId = int(id)
 
-		} else if err != nil {
-			log.Fatal(err)
+			} else {
+				log.Println(err)
+				continue
+			}
 
 		} else {
 			_, err := stmtUpdatePerson.Exec(
@@ -221,39 +226,46 @@ func jsonParse(done chan bool, jsonPaths []string) {
 				time.Now(), categoryId, regionId, statusId, candId,
 			)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				continue
 			}
 		}
 
 		_, err = stmtInsertStaff.Exec(person.PositionName, person.Department, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		_, err = stmtInsertDocument.Exec("Паспорт", person.PassportSerial,
 			person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		_, err = stmtInsertAddress.Exec("Адрес проживания", person.ValidAddress, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		_, err = stmtInsertAddress.Exec("Адрес регистрации", person.RegAddress, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		_, err = stmtInsertContacts.Exec("Телефон", person.ContactPhone, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		_, err = stmtInsertContacts.Exec("Электронная почта", person.Email, candId)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		for _, item := range person.parseAffilation() {
@@ -261,7 +273,8 @@ func jsonParse(done chan bool, jsonPaths []string) {
 				item.View, item.Name, item.Inn, item.Position, time.Now(), candId,
 			)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				continue
 			}
 		}
 
@@ -271,9 +284,9 @@ func jsonParse(done chan bool, jsonPaths []string) {
 				item.Position, item.FireReason, candId,
 			)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				continue
 			}
-
 		}
 	}
 	done <- true
@@ -301,7 +314,7 @@ func (person Person) parseEducation() string {
 	var education []string
 	if len(person.Education) > 0 {
 		for _, item := range person.Education {
-			education = append(education, fmt.Sprintf("%s %s %d %d",
+			education = append(education, fmt.Sprintf("%s, %s, %d, %d",
 				item.EducationType, item.InstitutionName, item.BeginYear, item.EndYear))
 		}
 	}

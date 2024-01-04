@@ -97,7 +97,8 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 	for idx, file := range excelFiles {
 		f, err := excelize.OpenFile(filepath.Join(excelPaths[idx], file))
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			continue
 		}
 		defer f.Close()
 
@@ -115,7 +116,8 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
 				if err != nil {
-					log.Fatal(err)
+					fmt.Println(err)
+					continue
 				}
 
 				if fio == "ФИО" {
@@ -166,22 +168,25 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 				anketa.fullname, anketa.birthday,
 			)
 			err = result.Scan(&candId)
-			if err != nil && err != sql.ErrNoRows {
-				candId = 0
-			}
-
-			if err == sql.ErrNoRows {
-				result, err := stmtInsertPerson.Exec(
-					anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
-				)
-				if err != nil {
-					log.Fatal(err)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					result, err := stmtInsertPerson.Exec(
+						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
+					)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					id, err := result.LastInsertId()
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					candId = int(id)
+				} else {
+					fmt.Println(err)
+					continue
 				}
-				id, err := result.LastInsertId()
-				if err != nil {
-					log.Fatal(err)
-				}
-				candId = int(id)
 
 			} else {
 				if fio == "" {
@@ -189,14 +194,16 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						log.Fatal(err)
+						fmt.Println(err)
+						continue
 					}
 				} else {
 					_, err := stmtShortUpdatePerson.Exec(
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						log.Fatal(err)
+						fmt.Println(err)
+						continue
 					}
 				}
 
@@ -206,7 +213,8 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affilation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				continue
 			}
 
 		} else {
@@ -216,10 +224,10 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 			robot.employee = parseStringCell(f, "Лист1", "B27")
 			robot.terrorist = parseStringCell(f, "Лист1", "B17")
 			robot.inn = parseStringCell(f, "Лист1", "B18")
-			bankruptcy1 := parseStringCell(f, "Лист1", "B20")
-			bankruptcy2 := parseStringCell(f, "Лист1", "B21")
-			bankruptcy3 := parseStringCell(f, "Лист1", "B22")
-			robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bankruptcy1, bankruptcy2, bankruptcy3)
+			bnkrpt := parseStringCell(f, "Лист1", "B20")
+			bnkrpt2 := parseStringCell(f, "Лист1", "B21")
+			bnkrpt3 := parseStringCell(f, "Лист1", "B22")
+			robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bnkrpt, bnkrpt2, bnkrpt3)
 			robot.mvd = parseStringCell(f, "Лист1", "B23")
 			robot.courts = parseStringCell(f, "Лист1", "B24")
 			robot.bki = parseStringCell(f, "Лист1", "B25")
@@ -229,34 +237,40 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 				anketa.fullname, anketa.birthday,
 			)
 			err = result.Scan(&candId)
-			if err != nil && err != sql.ErrNoRows {
-				candId = 0
-			}
-			if err == sql.ErrNoRows {
-				result, err := stmtShortInsertPerson.Exec(
-					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
-				)
-				if err != nil {
-					log.Fatal(err)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					result, err := stmtShortInsertPerson.Exec(
+						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
+					)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					id, err := result.LastInsertId()
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					candId = int(id)
+				} else {
+					fmt.Println(err)
+					continue
 				}
-				id, err := result.LastInsertId()
-				if err != nil {
-					log.Fatal(err)
-				}
-				candId = int(id)
 
 			} else {
 				_, err := stmtShortUpdatePerson.Exec(
 					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 				)
 				if err != nil {
-					log.Fatal(err)
+					fmt.Println(err)
+					continue
 				}
 			}
 
 			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				continue
 			}
 		}
 	}
