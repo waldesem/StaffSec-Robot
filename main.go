@@ -34,8 +34,7 @@ var infoPath string = filepath.Join(workDir, infoFile)
 var databaseURI string = filepath.Join(basePath, database)
 
 func main() {
-	now := time.Now()
-	timeNow := now.Format("2006-01-02")
+	timeNow := time.Now().Format("2006-01-02")
 
 	workFileStat, err := os.Stat(workPath)
 	if err != nil {
@@ -69,7 +68,7 @@ func main() {
 			parseMainFile()
 		}
 	}
-	fmt.Printf("Total time: %s\n", time.Since(now))
+	fmt.Printf("Success\n")
 }
 
 func parseInfoFile() {
@@ -116,8 +115,8 @@ func parseInfoFile() {
 	numRows := getRowNumbers(f, "Лист1", "G")
 	if len(numRows) > 0 {
 		for _, num := range numRows {
-			var candId int
 
+			var candId int
 			info := parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num))
 			initiator := parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num))
 			fullname := strings.ToUpper(parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num)))
@@ -133,16 +132,19 @@ func parseInfoFile() {
 						fullname, birthday, deadline, categoryId, regionId, statusId,
 					)
 					if err != nil {
-						log.Fatal(err)
+						log.Println(err)
+						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						log.Fatal(err)
+						log.Println(err)
+						continue
 					}
 					candId = int(id)
 
 				} else {
-					log.Fatal(err)
+					log.Println(err)
+					continue
 				}
 
 			} else {
@@ -150,7 +152,8 @@ func parseInfoFile() {
 					deadline, candId,
 				)
 				if err != nil {
-					log.Fatal(err)
+					log.Println(err)
+					continue
 				}
 			}
 
@@ -158,7 +161,8 @@ func parseInfoFile() {
 				info, initiator, deadline, candId,
 			)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				continue
 			}
 		}
 	}
