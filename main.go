@@ -198,7 +198,7 @@ func parseMainFile() {
 			for _, name := range fio {
 				if strings.EqualFold(dir.Name(), name) {
 					subdir = append(subdir, dir.Name())
-					break
+					continue
 				}
 			}
 		}
@@ -228,21 +228,12 @@ func parseMainFile() {
 			}
 		}
 
-		excelPathDone := make(chan bool)
 		if len(excelPaths) > 0 {
-			go excelParse(excelPathDone, excelPaths, excelFiles)
+			go excelParse(excelPaths, excelFiles)
 		}
 
-		jsonPathDone := make(chan bool)
 		if len(jsonPaths) > 0 {
-			go jsonParse(jsonPathDone, jsonPaths)
-		}
-
-		if len(excelPaths) > 0 {
-			<-excelPathDone
-		}
-		if len(jsonPaths) > 0 {
-			<-jsonPathDone
+			go jsonParse(jsonPaths)
 		}
 
 		for _, num := range numRows {

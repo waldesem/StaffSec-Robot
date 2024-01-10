@@ -95,7 +95,7 @@ type Person struct {
 	Organizations                     []Organization `json:"organizations"`
 }
 
-func jsonParse(done chan bool, jsonPaths []string) {
+func jsonParse(jsonPaths []string) {
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
@@ -289,7 +289,6 @@ func jsonParse(done chan bool, jsonPaths []string) {
 			}
 		}
 	}
-	done <- true
 }
 
 func (person Person) parseFullname() string {

@@ -50,7 +50,7 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
+func excelParse(excelPaths []string, excelFiles []string) {
 	db, err := sql.Open("sqlite3", databaseURI)
 	if err != nil {
 		log.Fatal(err)
@@ -274,5 +274,4 @@ func excelParse(done chan bool, excelPaths []string, excelFiles []string) {
 			}
 		}
 	}
-	done <- true
 }
