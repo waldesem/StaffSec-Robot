@@ -49,19 +49,19 @@ func main() {
 	infoFileDate := infoFileStat.ModTime().Format("2006-01-02")
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
-		err := copyFile(databaseURI, filepath.Join(archiveDir, database))
+		err := copyFile(databaseURI, filepath.Join(archiveDir2, database))
 		if err != nil {
 			log.Fatal(err)
 		}
 		if timeNow == infoFileDate {
-			err := copyFile(infoPath, filepath.Join(archiveDir, infoFile))
+			err := copyFile(infoPath, filepath.Join(archiveDir2, infoFile))
 			if err != nil {
 				log.Fatal(err)
 			}
 			parseInfoFile()
 		}
 		if timeNow == workFileDate {
-			err := copyFile(workPath, filepath.Join(archiveDir, workFile))
+			err := copyFile(workPath, filepath.Join(archiveDir2, workFile))
 			if err != nil {
 				log.Fatal(err)
 			}
