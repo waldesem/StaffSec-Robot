@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,13 +287,9 @@ func parseMainFile(db *sql.DB) int {
 						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
 					}
 					f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+
 					subPath := filepath.Join(workDir, sub)
-					err = copyDir(subPath, lnk)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-					err = os.RemoveAll(subPath)
+					err = moveDir(subPath, lnk)
 					if err != nil {
 						fmt.Println(err)
 						continue
@@ -396,32 +391,32 @@ func copyFile(src, dest string) error {
 	return nil
 }
 
-func copyDir(src string, dest string) error {
+func moveDir(src string, dest string) error {
 	err := os.MkdirAll(dest, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	err = filepath.WalkDir(src, func(path string, d fs.DirEntry, walkErr error) error {
-		if path == src {
-			return nil
-		}
+	srcDir, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
 
-		relativePath, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		destPath := filepath.Join(dest, relativePath)
-
-		if !d.IsDir() {
-			err = copyFile(path, destPath)
+	for _, f := range srcDir {
+		if f.IsDir() {
+			err = moveDir(filepath.Join(src, f.Name()), filepath.Join(dest, f.Name()))
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(filepath.Join(src, f.Name()), filepath.Join(dest, f.Name()))
 			if err != nil {
 				return err
 			}
 		}
-		return nil
-	})
-	return err
+	}
+	os.RemoveAll(src)
+	return nil
 }
 
 func getRowNumbers(f *excelize.File, listName string, collName string, parsedRows int) []int {
