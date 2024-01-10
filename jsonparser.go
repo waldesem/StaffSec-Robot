@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -95,18 +93,13 @@ type Person struct {
 	Organizations                     []Organization `json:"organizations"`
 }
 
-func jsonParse(jsonPaths []string) {
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
+func jsonParse(db *sql.DB, jsonPaths []string) {
 	stmtUpdatePerson, err := db.Prepare(
 		"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtUpdatePerson.Close()
 
@@ -114,7 +107,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO persons (fullname, previous, birthday, birthplace, country, ext_country, snils, inn, marital, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertPerson.Close()
 
@@ -122,7 +116,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO staffs (position, department, person_id) VALUES (?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertStaff.Close()
 
@@ -130,7 +125,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO documents (view, series, number, issue, agency, person_id) VALUES (?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertDocument.Close()
 
@@ -138,7 +134,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO addresses (view, address, person_id) VALUES (?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertAddress.Close()
 
@@ -146,7 +143,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO contacts (view, contact, person_id) VALUES (?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertContacts.Close()
 
@@ -154,7 +152,8 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO affilations (view, name, inn, position, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertAffiliation.Close()
 
@@ -162,30 +161,24 @@ func jsonParse(jsonPaths []string) {
 		"INSERT INTO workplaces (start_date, end_date, workplace, address, position, reason, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertWorkplace.Close()
 
 	for _, path := range jsonPaths {
-		f, err := os.Open(path)
+		f, err := os.ReadFile(path)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
-		defer f.Close()
 
 		var candId int
 		var person Person
 
-		jsonData, err := io.ReadAll(f)
+		err = json.Unmarshal(f, &person)
 		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		err = json.Unmarshal(jsonData, &person)
-		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
@@ -203,18 +196,18 @@ func jsonParse(jsonPaths []string) {
 					person.parseEducation(), time.Now(), categoryId, regionId, statusId,
 				)
 				if err != nil {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 				id, err := ins.LastInsertId()
 				if err != nil {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 				candId = int(id)
 
 			} else {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 
@@ -226,45 +219,45 @@ func jsonParse(jsonPaths []string) {
 				time.Now(), categoryId, regionId, statusId, candId,
 			)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}
 
 		_, err = stmtInsertStaff.Exec(person.PositionName, person.Department, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
 		_, err = stmtInsertDocument.Exec("Паспорт", person.PassportSerial,
 			person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
 		_, err = stmtInsertAddress.Exec("Адрес проживания", person.ValidAddress, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
 		_, err = stmtInsertAddress.Exec("Адрес регистрации", person.RegAddress, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
 		_, err = stmtInsertContacts.Exec("Телефон", person.ContactPhone, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
 		_, err = stmtInsertContacts.Exec("Электронная почта", person.Email, candId)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
@@ -273,7 +266,7 @@ func jsonParse(jsonPaths []string) {
 				item.View, item.Name, item.Inn, item.Position, time.Now(), candId,
 			)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}
@@ -284,7 +277,7 @@ func jsonParse(jsonPaths []string) {
 				item.Position, item.FireReason, candId,
 			)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}

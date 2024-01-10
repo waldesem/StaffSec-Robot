@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,47 +50,46 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(excelPaths []string, excelFiles []string) {
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	defer db.Close()
-
+func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtUpdatePerson.Close()
 
 	stmtShortUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtUpdatePerson.Close()
 
 	stmtShortInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtShortInsertPerson.Close()
 
 	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertPerson.Close()
 
 	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertCheck.Close()
 
 	stmtInsertRobot, err := db.Prepare("INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer stmtInsertRobot.Close()
 
@@ -103,7 +102,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 
 		f, err := excelize.OpenFile(filepath.Join(excelPaths[idx], file))
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			continue
 		}
 
@@ -116,7 +115,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
 				if err != nil {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 
@@ -181,17 +180,17 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 
@@ -201,7 +200,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 				} else {
@@ -209,7 +208,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 				}
@@ -220,7 +219,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affilation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 
@@ -251,17 +250,17 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						log.Println(err)
+						fmt.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 
@@ -270,14 +269,14 @@ func excelParse(excelPaths []string, excelFiles []string) {
 					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 				)
 				if err != nil {
-					log.Println(err)
+					fmt.Println(err)
 					continue
 				}
 			}
 
 			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}
