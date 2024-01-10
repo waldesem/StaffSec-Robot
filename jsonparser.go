@@ -300,7 +300,7 @@ func (person Person) parsePrevious() string {
 	var previous []string
 	if person.HasNameChanged {
 		for _, item := range person.NameWasChanged {
-			previous = append(previous, fmt.Sprintf("%s - %s %d %s, %s",
+			previous = append(previous, fmt.Sprintf("%s, %s: %d %s, %s;",
 				item.FirstNameBeforeChange, item.LastNameBeforeChange,
 				item.YearOfChange, item.NameChangeDocument, item.Reason,
 			))

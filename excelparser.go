@@ -95,19 +95,19 @@ func excelParse(excelPaths []string, excelFiles []string) {
 	defer stmtInsertRobot.Close()
 
 	for idx, file := range excelFiles {
-		f, err := excelize.OpenFile(filepath.Join(excelPaths[idx], file))
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		defer f.Close()
-
 		var candId int
 		var fio string
 		var anketa Anketa
 		var check Check
 		var robot Robot
 
+		f, err := excelize.OpenFile(filepath.Join(excelPaths[idx], file))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		defer f.Close()
 		if strings.HasPrefix(file, "Заключение") {
 			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "C6")))
 			anketa.birthday = parseDateCell(f, "Лист1", "C8", "02.01.2006")
@@ -116,7 +116,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -151,7 +151,14 @@ func excelParse(excelPaths []string, excelFiles []string) {
 			if err != nil {
 				decision = "Согласовано"
 			}
-			check.conclusion = getConclusionId(decision)
+			row := db.QueryRow(
+				"SELECT id FROM conclusions WHERE LOWER(conclusion) = $1",
+				strings.ToLower(decision),
+			)
+			err = row.Scan(&check.conclusion)
+			if err != nil {
+				check.conclusion = 1
+			}
 			check.deadline = time.Now()
 			poligraf, err := f.GetCellValue("Лист1", "C26")
 			if err != nil {
@@ -174,17 +181,17 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -194,7 +201,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 				} else {
@@ -202,7 +209,7 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 				}
@@ -213,11 +220,12 @@ func excelParse(excelPaths []string, excelFiles []string) {
 				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affilation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 
 		} else {
+
 			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "B4")))
 			anketa.birthday = parseDateCell(f, "Лист1", "B5", "02.01.2006")
 
@@ -243,17 +251,17 @@ func excelParse(excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -262,14 +270,14 @@ func excelParse(excelPaths []string, excelFiles []string) {
 					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 				)
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 			}
 
 			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 		}
