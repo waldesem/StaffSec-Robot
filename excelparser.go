@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"os"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,59 +50,52 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
+func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
 	stmtShortUpdatePerson, err := db.Prepare("UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
 	stmtShortInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtShortInsertPerson.Close()
 
 	stmtInsertPerson, err := db.Prepare("INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
 	stmtInsertCheck, err := db.Prepare("INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtInsertCheck.Close()
 
 	stmtInsertRobot, err := db.Prepare("INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtInsertRobot.Close()
 
-	for idx, file := range excelFiles {
+	for idx, file := range *excelFiles {
 		var candId int
 		var fio string
 		var anketa Anketa
-		var check Check
-		var robot Robot
 
-		f, err := excelize.OpenFile(filepath.Join(excelPaths[idx], file))
+		pathsExcel := *excelPaths
+		f, err := excelize.OpenFile(filepath.Join(pathsExcel[idx], file))
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			continue
 		}
 
@@ -115,7 +108,7 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -130,7 +123,7 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 					anketa.education = parseStringCell(f, "Лист2", "W3")
 				}
 			}
-
+			var check Check
 			wp1 := parseStringCell(f, "Лист1", "D11")
 			wp2 := parseStringCell(f, "Лист1", "D12")
 			wp3 := parseStringCell(f, "Лист1", "D13")
@@ -180,17 +173,17 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -200,7 +193,7 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace, anketa.country, anketa.snils, anketa.inn, anketa.education, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 				} else {
@@ -208,7 +201,7 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 				}
@@ -219,11 +212,12 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 				check.workplace, check.cronos, check.cros, check.document, check.debt, check.bankruptcy, check.bki, check.affilation, check.internet, check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
 			)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 
 		} else {
+			var robot Robot
 
 			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "B4")))
 			anketa.birthday = parseDateCell(f, "Лист1", "B5", "02.01.2006")
@@ -250,17 +244,17 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 						anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId,
 					)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					id, err := result.LastInsertId()
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 					candId = int(id)
 				} else {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -269,14 +263,14 @@ func excelParse(db *sql.DB, excelPaths []string, excelFiles []string) {
 					anketa.fullname, anketa.birthday, time.Now(), categoryId, regionId, statusId, candId,
 				)
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 			}
 
 			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist, robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 		}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,15 +35,13 @@ func main() {
 
 	workFileStat, err := os.Stat(workPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	workFileDate := workFileStat.ModTime().Format("2006-01-02")
 
 	infoFileStat, err := os.Stat(infoPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	infoFileDate := infoFileStat.ModTime().Format("2006-01-02")
 
@@ -54,27 +53,24 @@ func main() {
 	if timeNow == workFileDate || timeNow == infoFileDate {
 		err := copyFile(databaseURI, filepath.Join(archiveDir, database))
 		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
 		}
 		db, err := sql.Open("sqlite3", databaseURI)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 		defer db.Close()
 		if timeNow == workFileDate {
 			err := copyFile(workPath, filepath.Join(archiveDir, workFile))
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				log.Fatal(err)
 			}
 			resultMainFile = parseMainFile(db)
 		}
 		if timeNow == infoFileDate {
 			err := copyFile(infoPath, filepath.Join(archiveDir, infoFile))
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				log.Fatal(err)
 			}
 			resultInfoFile = parseInfoFile(db)
 		}
@@ -87,8 +83,7 @@ func parseInfoFile(db *sql.DB) int {
 
 	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtSelectPerson.Close()
 
@@ -96,15 +91,13 @@ func parseInfoFile(db *sql.DB) int {
 		"INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtInsertPerson.Close()
 
 	stmtUpdatePerson, err := db.Prepare("UPDATE persons SET updated = ? WHERE id = ?")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtUpdatePerson.Close()
 
@@ -112,15 +105,13 @@ func parseInfoFile(db *sql.DB) int {
 		"INSERT INTO inquiries (info, initiator, deadline, person_id) VALUES (?, ?, ?, ?)",
 	)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer stmtInsertInquiry.Close()
 
 	f, err := excelize.OpenFile(infoPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer f.Close()
 
@@ -158,18 +149,18 @@ func parseInfoFile(db *sql.DB) int {
 					categoryId, regionId, statusId,
 				)
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 				id, err := result.LastInsertId()
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 				candId = int(id)
 
 			} else {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 
@@ -178,7 +169,7 @@ func parseInfoFile(db *sql.DB) int {
 				fileInfo.DeadLine, candId,
 			)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 		}
@@ -187,7 +178,7 @@ func parseInfoFile(db *sql.DB) int {
 			fileInfo.Info, fileInfo.Initiattor, fileInfo.Initiattor, candId,
 		)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			continue
 		}
 	}
@@ -197,8 +188,7 @@ func parseInfoFile(db *sql.DB) int {
 func parseMainFile(db *sql.DB) int {
 	f, err := excelize.OpenFile(workPath)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer f.Close()
 
@@ -211,7 +201,7 @@ func parseMainFile(db *sql.DB) int {
 		for _, num := range numRows {
 			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 			fio = append(fio, strings.TrimSpace(cell))
@@ -219,7 +209,7 @@ func parseMainFile(db *sql.DB) int {
 
 		workDirs, err := os.ReadDir(workDir)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 
 		subdir := make([]string, 0, parsedRows)
@@ -240,7 +230,7 @@ func parseMainFile(db *sql.DB) int {
 			subdirPath := filepath.Join(workDir, sub)
 			workSubDirs, err := os.ReadDir(subdirPath)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 			for _, file := range workSubDirs {
@@ -257,17 +247,17 @@ func parseMainFile(db *sql.DB) int {
 		}
 
 		if len(excelPaths) > 0 {
-			excelParse(db, excelPaths, excelFiles)
+			excelParse(db, &excelPaths, &excelFiles)
 		}
 		if len(jsonPaths) > 0 {
-			jsonParse(db, jsonPaths)
+			jsonParse(db, &jsonPaths)
 		}
 
 		for _, num := range numRows {
 			for _, sub := range subdir {
 				cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 
@@ -291,7 +281,7 @@ func parseMainFile(db *sql.DB) int {
 					subPath := filepath.Join(workDir, sub)
 					err = moveDir(subPath, lnk)
 					if err != nil {
-						fmt.Println(err)
+						log.Println(err)
 						continue
 					}
 				}
@@ -300,8 +290,7 @@ func parseMainFile(db *sql.DB) int {
 
 		stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 		defer stmtSelectPerson.Close()
 
@@ -309,15 +298,13 @@ func parseMainFile(db *sql.DB) int {
 			"INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 		defer stmtInsertPerson.Close()
 
 		stmtUpdatePerson, err := db.Prepare("UPDATE persons SET path = ?, updated = ? WHERE id = ?")
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 		defer stmtUpdatePerson.Close()
 
@@ -331,14 +318,14 @@ func parseMainFile(db *sql.DB) int {
 			row := stmtSelectPerson.QueryRow(fullname, birthday)
 			err = row.Scan(&candId)
 			if err != nil && err != sql.ErrNoRows {
-				fmt.Println(err)
+				log.Println(err)
 				continue
 			}
 
 			if err == sql.ErrNoRows {
 				result, err := stmtInsertPerson.Exec(fullname, birthday, time.Now(), url, categoryId, regionId, statusId)
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 				id, _ := result.LastInsertId()
@@ -347,7 +334,7 @@ func parseMainFile(db *sql.DB) int {
 			} else {
 				_, err = stmtUpdatePerson.Exec(url, time.Now(), candId)
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 					continue
 				}
 			}
@@ -360,8 +347,7 @@ func parseMainFile(db *sql.DB) int {
 func getCurrentPath() (cur string) {
 	cur, err := os.Getwd()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	return
 }
@@ -420,19 +406,17 @@ func moveDir(src string, dest string) error {
 }
 
 func getRowNumbers(f *excelize.File, listName string, collName string, parsedRows int) []int {
-
 	numRows := make([]int, 0, parsedRows)
-
 	for i := 2; i < parsedRows; i++ {
 		cell, err := f.GetCellValue(listName, fmt.Sprintf("%s%d", collName, i))
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			continue
 		}
 		if cell != "" {
 			t, err := time.Parse("02/01/2006", cell)
 			if err != nil {
-				// fmt.Println(err)
+				// log.Println(err)
 				continue
 			}
 			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
@@ -465,7 +449,7 @@ func parseDateCell(f *excelize.File, listName string, cellName string, format st
 
 func trimmString(value string) string {
 	splited := strings.Split(value, " ")
-	trimmed := make([]string, 0)
+	trimmed := make([]string, 0, len(splited))
 	for _, item := range splited {
 		if item != "" {
 			trimmed = append(trimmed, strings.TrimSpace(item))
