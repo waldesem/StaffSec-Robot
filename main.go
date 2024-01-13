@@ -48,6 +48,12 @@ func main() {
 	var resultMainFile int
 	var resultInfoFile int
 
+	db, err := sql.Open("sqlite3", databaseURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
 	timeNow := now.Format("2006-01-02")
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
@@ -55,11 +61,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		db, err := sql.Open("sqlite3", databaseURI)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer db.Close()
+
 		if timeNow == workFileDate {
 			err := copyFile(workPath, filepath.Join(archiveDir, workFile))
 			if err != nil {
@@ -67,6 +69,7 @@ func main() {
 			}
 			resultMainFile = parseMainFile(db)
 		}
+
 		if timeNow == infoFileDate {
 			err := copyFile(infoPath, filepath.Join(archiveDir, infoFile))
 			if err != nil {
@@ -80,6 +83,14 @@ func main() {
 }
 
 func parseInfoFile(db *sql.DB) int {
+	type InfoFile struct {
+		CandId     int
+		Info       string
+		Initiattor string
+		FullName   string
+		BirthDay   string
+		DeadLine   time.Time
+	}
 
 	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 	if err != nil {
@@ -115,32 +126,30 @@ func parseInfoFile(db *sql.DB) int {
 	}
 	defer f.Close()
 
-	type InfoFile struct {
-		CandId     int
-		Info       string
-		Initiattor string
-		FullName   string
-		BirthDay   string
-		DeadLine   time.Time
-	}
-
 	parsedRows := 10000
 	var numRows = make([]int, 0, parsedRows)
-	numRows = getRowNumbers(f, "Лист1", "G", parsedRows)
+	for i := 1; i < parsedRows; i++ {
+		t, err := parseDateCell(f, "Лист1", fmt.Sprintf("G%d", i))
+		if err == nil && t == time.Now().Format("2006-01-02") {
+			numRows = append(numRows, i)
+		}
+	}
 
 	for _, num := range numRows {
-		var candId int
-
+		birth, err := parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num))
+		if err != nil {
+			birth = "2006-01-02"
+		}
 		fileInfo := InfoFile{
 			Info:       parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num)),
 			Initiattor: parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num)),
 			FullName:   strings.ToUpper(parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num))),
-			BirthDay:   parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num), "02/01/2006"),
+			BirthDay:   birth,
 			DeadLine:   time.Now(),
 		}
 
 		row := stmtSelectPerson.QueryRow(fileInfo.FullName, fileInfo.BirthDay)
-		err = row.Scan(&candId)
+		err = row.Scan(&fileInfo.CandId)
 
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -157,7 +166,7 @@ func parseInfoFile(db *sql.DB) int {
 					log.Println(err)
 					continue
 				}
-				candId = int(id)
+				fileInfo.CandId = int(id)
 
 			} else {
 				log.Println(err)
@@ -166,7 +175,7 @@ func parseInfoFile(db *sql.DB) int {
 
 		} else {
 			_, err := stmtUpdatePerson.Exec(
-				fileInfo.DeadLine, candId,
+				fileInfo.DeadLine, fileInfo.CandId,
 			)
 			if err != nil {
 				log.Println(err)
@@ -175,7 +184,7 @@ func parseInfoFile(db *sql.DB) int {
 		}
 
 		_, err = stmtInsertInquiry.Exec(
-			fileInfo.Info, fileInfo.Initiattor, fileInfo.Initiattor, candId,
+			fileInfo.Info, fileInfo.Initiattor, fileInfo.Initiattor, fileInfo.CandId,
 		)
 		if err != nil {
 			log.Println(err)
@@ -193,8 +202,13 @@ func parseMainFile(db *sql.DB) int {
 	defer f.Close()
 
 	parsedRows := 100000
-	var numRows = make([]int, 0, parsedRows)
-	numRows = getRowNumbers(f, "Кандидаты", "K", parsedRows)
+	var numRows = []int{}
+	for i := 1; i < parsedRows; i++ {
+		t, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
+		if err == nil && t == time.Now().Format("2006-01-02") {
+			numRows = append(numRows, i)
+		}
+	}
 
 	if len(numRows) > 0 {
 		fio := make([]string, 0, parsedRows)
@@ -313,8 +327,10 @@ func parseMainFile(db *sql.DB) int {
 
 			url := parseStringCell(f, "Кандидаты", fmt.Sprintf("L%d", num))
 			fullname := strings.ToTitle(parseStringCell(f, "Кандидаты", fmt.Sprintf("B%d", num)))
-			birthday := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num), "02/01/2006")
-
+			birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
+			if err != nil {
+				birthday = "2006-01-02"
+			}
 			row := stmtSelectPerson.QueryRow(fullname, birthday)
 			err = row.Scan(&candId)
 			if err != nil && err != sql.ErrNoRows {
@@ -376,10 +392,8 @@ func copyFile(src, dest string) error {
 	}
 	return nil
 }
-
 func moveDir(src string, dest string) error {
-	err := os.MkdirAll(dest, os.ModePerm)
-	if err != nil {
+	if err := os.MkdirAll(dest, os.ModePerm); err != nil {
 		return err
 	}
 
@@ -401,30 +415,8 @@ func moveDir(src string, dest string) error {
 			}
 		}
 	}
-	os.RemoveAll(src)
-	return nil
-}
 
-func getRowNumbers(f *excelize.File, listName string, collName string, parsedRows int) []int {
-	numRows := make([]int, 0, parsedRows)
-	for i := 2; i < parsedRows; i++ {
-		cell, err := f.GetCellValue(listName, fmt.Sprintf("%s%d", collName, i))
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		if cell != "" {
-			t, err := time.Parse("02/01/2006", cell)
-			if err != nil {
-				// log.Println(err)
-				continue
-			}
-			if t.Format("2006-01-02") == time.Now().Format("2006-01-02") {
-				numRows = append(numRows, i)
-			}
-		}
-	}
-	return numRows
+	return os.RemoveAll(src)
 }
 
 func parseStringCell(f *excelize.File, listName string, cellName string) string {
@@ -435,25 +427,19 @@ func parseStringCell(f *excelize.File, listName string, cellName string) string 
 	return cell
 }
 
-func parseDateCell(f *excelize.File, listName string, cellName string, format string) string {
+func parseDateCell(f *excelize.File, listName string, cellName string) (string, error) {
 	cell, err := f.GetCellValue(listName, cellName)
-	if err != nil {
-		cell = format
+	if err != nil || cell == "" {
+		return time.Now().Format("2006-01-02"), fmt.Errorf("error or empty cell")
 	}
-	day, err := time.Parse(format, cell)
-	if err != nil {
-		day = time.Now()
-	}
-	return day.Format("2006-01-02")
-}
 
-func trimmString(value string) string {
-	splited := strings.Split(value, " ")
-	trimmed := make([]string, 0, len(splited))
-	for _, item := range splited {
-		if item != "" {
-			trimmed = append(trimmed, strings.TrimSpace(item))
+	dateFormats := []string{"01-02-06", "06/01/02", "01-02-2006", "02/01/2006", "02.01.2006"}
+	for _, format := range dateFormats {
+		t, err := time.Parse(format, cell)
+		if err == nil {
+			return t.Format("2006-01-02"), nil
 		}
 	}
-	return strings.Join(trimmed, " ")
+
+	return time.Now().Format("2006-01-02"), fmt.Errorf("unable to parse date")
 }

@@ -279,7 +279,7 @@ func jsonParse(db *sql.DB, jsonPaths *[]string) {
 
 func (person Person) parseFullname() string {
 	name := fmt.Sprintf("%s %s %s", person.LastName, person.FirstName, person.MidName)
-	return strings.ToTitle(trimmString(name))
+	return strings.ToTitle(strings.Join(strings.Fields(name), " "))
 }
 
 func (person Person) parsePrevious() string {

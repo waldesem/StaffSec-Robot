@@ -101,8 +101,12 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 
 		defer f.Close()
 		if strings.HasPrefix(file, "Заключение") {
-			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "C6")))
-			anketa.birthday = parseDateCell(f, "Лист1", "C8", "02.01.2006")
+			name := parseStringCell(f, "Лист1", "C6")
+			anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
+			anketa.birthday, err = parseDateCell(f, "Лист1", "C8")
+			if err != nil {
+				anketa.birthday = "2006-01-02"
+			}
 			anketa.previous = parseStringCell(f, "Лист1", "C7")
 
 			if f.SheetCount > 1 {
@@ -113,9 +117,13 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 				}
 
 				if fio == "ФИО" {
-					anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист2", "K3")))
+					name := parseStringCell(f, "Лист2", "K3")
+					anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
 					anketa.previous = parseStringCell(f, "Лист2", "S3")
-					anketa.birthday = parseDateCell(f, "Лист2", "L3", "02.01.2006")
+					anketa.birthday, err = parseDateCell(f, "Лист2", "L3")
+					if err != nil {
+						anketa.birthday = "2006-01-02"
+					}
 					anketa.birthplace = parseStringCell(f, "Лист2", "M3")
 					anketa.country = parseStringCell(f, "Лист2", "T3")
 					anketa.snils = parseStringCell(f, "Лист2", "U3")
@@ -218,9 +226,12 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 
 		} else {
 			var robot Robot
-
-			anketa.fullname = strings.ToTitle(trimmString(parseStringCell(f, "Лист1", "B4")))
-			anketa.birthday = parseDateCell(f, "Лист1", "B5", "02.01.2006")
+			name := parseStringCell(f, "Лист1", "B4")
+			anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
+			anketa.birthday, err = parseDateCell(f, "Лист1", "B5")
+			if err != nil {
+				anketa.birthday = "2006-01-02"
+			}
 
 			robot.employee = parseStringCell(f, "Лист1", "B27")
 			robot.terrorist = parseStringCell(f, "Лист1", "B17")
