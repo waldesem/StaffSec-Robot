@@ -101,13 +101,13 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 
 		defer f.Close()
 		if strings.HasPrefix(file, "Заключение") {
-			name := parseStringCell(f, "Лист1", "C6")
+			name, _ := f.GetCellValue("Лист1", "C6")
 			anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
-			anketa.birthday, err = parseDateCell(f, "Лист1", "C8")
+			anketa.birthday, _ = f.GetCellValue("Лист1", "C8")
 			if err != nil {
 				anketa.birthday = "2006-01-02"
 			}
-			anketa.previous = parseStringCell(f, "Лист1", "C7")
+			anketa.previous, _ = f.GetCellValue("Лист1", "C7")
 
 			if f.SheetCount > 1 {
 				fio, err = f.GetCellValue("Лист2", "K1")
@@ -117,35 +117,35 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 				}
 
 				if fio == "ФИО" {
-					name := parseStringCell(f, "Лист2", "K3")
+					name, _ := f.GetCellValue("Лист2", "K3")
 					anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
-					anketa.previous = parseStringCell(f, "Лист2", "S3")
-					anketa.birthday, err = parseDateCell(f, "Лист2", "L3")
+					anketa.previous, _ = f.GetCellValue("Лист2", "S3")
+					anketa.birthday, _ = f.GetCellValue("Лист2", "L3")
 					if err != nil {
 						anketa.birthday = "2006-01-02"
 					}
-					anketa.birthplace = parseStringCell(f, "Лист2", "M3")
-					anketa.country = parseStringCell(f, "Лист2", "T3")
-					anketa.snils = parseStringCell(f, "Лист2", "U3")
-					anketa.inn = parseStringCell(f, "Лист2", "V3")
-					anketa.education = parseStringCell(f, "Лист2", "W3")
+					anketa.birthplace, _ = f.GetCellValue("Лист2", "M3")
+					anketa.country, _ = f.GetCellValue("Лист2", "T3")
+					anketa.snils, _ = f.GetCellValue("Лист2", "U3")
+					anketa.inn, _ = f.GetCellValue("Лист2", "V3")
+					anketa.education, _ = f.GetCellValue("Лист2", "W3")
 				}
 			}
 			var check Check
-			wp1 := parseStringCell(f, "Лист1", "D11")
-			wp2 := parseStringCell(f, "Лист1", "D12")
-			wp3 := parseStringCell(f, "Лист1", "D13")
+			wp1, _ := f.GetCellValue("Лист1", "D11")
+			wp2, _ := f.GetCellValue("Лист1", "D12")
+			wp3, _ := f.GetCellValue("Лист1", "D13")
 			check.workplace = fmt.Sprintf("%s; %s; %s", wp1, wp2, wp3)
-			check.cronos = parseStringCell(f, "Лист1", "C14")
-			check.cros = parseStringCell(f, "Лист1", "C16")
-			check.document = parseStringCell(f, "Лист1", "C17")
-			check.debt = parseStringCell(f, "Лист1", "C18")
-			check.bankruptcy = parseStringCell(f, "Лист1", "C19")
-			check.bki = parseStringCell(f, "Лист1", "C20")
-			check.affilation = parseStringCell(f, "Лист1", "C21")
-			check.internet = parseStringCell(f, "Лист1", "C22")
-			check.officer = parseStringCell(f, "Лист1", "C25")
-			check.addition = parseStringCell(f, "Лист1", "C28")
+			check.cronos, _ = f.GetCellValue("Лист1", "C14")
+			check.cros, _ = f.GetCellValue("Лист1", "C16")
+			check.document, _ = f.GetCellValue("Лист1", "C17")
+			check.debt, _ = f.GetCellValue("Лист1", "C18")
+			check.bankruptcy, _ = f.GetCellValue("Лист1", "C19")
+			check.bki, _ = f.GetCellValue("Лист1", "C20")
+			check.affilation, _ = f.GetCellValue("Лист1", "C21")
+			check.internet, _ = f.GetCellValue("Лист1", "C22")
+			check.officer, _ = f.GetCellValue("Лист1", "C25")
+			check.addition, _ = f.GetCellValue("Лист1", "C28")
 
 			decision, err := f.GetCellValue("Лист1", "C23")
 			if err != nil {
@@ -226,23 +226,23 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 
 		} else {
 			var robot Robot
-			name := parseStringCell(f, "Лист1", "B4")
+			name, _ := f.GetCellValue("Лист1", "B4")
 			anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
 			anketa.birthday, err = parseDateCell(f, "Лист1", "B5")
 			if err != nil {
 				anketa.birthday = "2006-01-02"
 			}
 
-			robot.employee = parseStringCell(f, "Лист1", "B27")
-			robot.terrorist = parseStringCell(f, "Лист1", "B17")
-			robot.inn = parseStringCell(f, "Лист1", "B18")
-			bnkrpt := parseStringCell(f, "Лист1", "B20")
-			bnkrpt2 := parseStringCell(f, "Лист1", "B21")
-			bnkrpt3 := parseStringCell(f, "Лист1", "B22")
+			robot.employee, _ = f.GetCellValue("Лист1", "B27")
+			robot.terrorist, _ = f.GetCellValue("Лист1", "B17")
+			robot.inn, _ = f.GetCellValue("Лист1", "B18")
+			bnkrpt, _ := f.GetCellValue("Лист1", "B20")
+			bnkrpt2, _ := f.GetCellValue("Лист1", "B21")
+			bnkrpt3, _ := f.GetCellValue("Лист1", "B22")
 			robot.bankruptcy = fmt.Sprintf("%s, %s, %s", bnkrpt, bnkrpt2, bnkrpt3)
-			robot.mvd = parseStringCell(f, "Лист1", "B23")
-			robot.courts = parseStringCell(f, "Лист1", "B24")
-			robot.bki = parseStringCell(f, "Лист1", "B25")
+			robot.mvd, _ = f.GetCellValue("Лист1", "B23")
+			robot.courts, _ = f.GetCellValue("Лист1", "B24")
+			robot.bki, _ = f.GetCellValue("Лист1", "B25")
 
 			result := db.QueryRow(
 				"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",

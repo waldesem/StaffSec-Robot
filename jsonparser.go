@@ -346,7 +346,7 @@ func (person Person) parseAffilation() []Organization {
 	if person.HasRelatedPersonsOrganizations {
 		for _, item := range person.RelatedPersonsOrganizations {
 			affilation = append(affilation, Organization{
-				View:     "Связанные лица работают в госудраственных организациях",
+				View:     "Связанные лица работают в государственных организациях",
 				Name:     item.Name,
 				Position: item.Position,
 				Inn:      item.Inn,

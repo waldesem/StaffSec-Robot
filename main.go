@@ -23,7 +23,8 @@ const (
 	regionId   = 1
 )
 
-var basePath string = filepath.Join(getCurrentPath(), "..")
+var currentPath, _ = os.Getwd()
+var basePath string = filepath.Join(currentPath, "..")
 var databaseURI string = filepath.Join(basePath, database)
 var workDir string = filepath.Join(basePath, "Кандидаты")
 var workPath string = filepath.Join(workDir, workFile)
@@ -48,12 +49,6 @@ func main() {
 	var resultMainFile int
 	var resultInfoFile int
 
-	db, err := sql.Open("sqlite3", databaseURI)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
 	timeNow := now.Format("2006-01-02")
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
@@ -61,6 +56,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		db, err := sql.Open("sqlite3", databaseURI)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
 
 		if timeNow == workFileDate {
 			err := copyFile(workPath, filepath.Join(archiveDir, workFile))
@@ -78,19 +79,11 @@ func main() {
 			resultInfoFile = parseInfoFile(db)
 		}
 	}
-	fmt.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
+	log.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
 		resultMainFile, resultInfoFile, time.Since(now).Milliseconds())
 }
 
 func parseInfoFile(db *sql.DB) int {
-	type InfoFile struct {
-		CandId     int
-		Info       string
-		Initiattor string
-		FullName   string
-		BirthDay   string
-		DeadLine   time.Time
-	}
 
 	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 	if err != nil {
@@ -140,55 +133,50 @@ func parseInfoFile(db *sql.DB) int {
 		if err != nil {
 			birth = "2006-01-02"
 		}
-		fileInfo := InfoFile{
-			Info:       parseStringCell(f, "Лист1", fmt.Sprintf("E%d", num)),
-			Initiattor: parseStringCell(f, "Лист1", fmt.Sprintf("F%d", num)),
-			FullName:   strings.ToUpper(parseStringCell(f, "Лист1", fmt.Sprintf("A%d", num))),
-			BirthDay:   birth,
-			DeadLine:   time.Now(),
-		}
 
-		row := stmtSelectPerson.QueryRow(fileInfo.FullName, fileInfo.BirthDay)
-		err = row.Scan(&fileInfo.CandId)
+		var candId int
+		info, _ := f.GetCellValue("Лист1", fmt.Sprintf("E%d", num))
+		initiattor, _ := f.GetCellValue("Лист1", fmt.Sprintf("F%d", num))
+		fullName, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+		birthDay := birth
+		deadLine := time.Now()
+
+		row := stmtSelectPerson.QueryRow(fullName, birthDay)
+		err = row.Scan(&candId)
 
 		if err != nil {
 			if err == sql.ErrNoRows {
 				result, err := stmtInsertPerson.Exec(
-					fileInfo.FullName, fileInfo.BirthDay, fileInfo.DeadLine,
+					fullName, birthDay, deadLine,
 					categoryId, regionId, statusId,
 				)
 				if err != nil {
 					log.Println(err)
-					continue
 				}
 				id, err := result.LastInsertId()
 				if err != nil {
 					log.Println(err)
-					continue
 				}
-				fileInfo.CandId = int(id)
+				candId = int(id)
 
 			} else {
 				log.Println(err)
-				continue
 			}
 
 		} else {
 			_, err := stmtUpdatePerson.Exec(
-				fileInfo.DeadLine, fileInfo.CandId,
+				deadLine, candId,
 			)
 			if err != nil {
 				log.Println(err)
-				continue
 			}
 		}
 
 		_, err = stmtInsertInquiry.Exec(
-			fileInfo.Info, fileInfo.Initiattor, fileInfo.Initiattor, fileInfo.CandId,
+			info, initiattor, deadLine, candId,
 		)
 		if err != nil {
 			log.Println(err)
-			continue
 		}
 	}
 	return len(numRows)
@@ -202,7 +190,7 @@ func parseMainFile(db *sql.DB) int {
 	defer f.Close()
 
 	parsedRows := 100000
-	var numRows = []int{}
+	var numRows = make([]int, 0, parsedRows)
 	for i := 1; i < parsedRows; i++ {
 		t, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
@@ -325,8 +313,9 @@ func parseMainFile(db *sql.DB) int {
 		for _, num := range numRows {
 			var candId int
 
-			url := parseStringCell(f, "Кандидаты", fmt.Sprintf("L%d", num))
-			fullname := strings.ToTitle(parseStringCell(f, "Кандидаты", fmt.Sprintf("B%d", num)))
+			url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+			name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+			fullname := strings.ToTitle(name)
 			birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
 			if err != nil {
 				birthday = "2006-01-02"
@@ -358,14 +347,6 @@ func parseMainFile(db *sql.DB) int {
 		f.SaveAs(filepath.Join(workDir, workFile))
 	}
 	return len(numRows)
-}
-
-func getCurrentPath() (cur string) {
-	cur, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return
 }
 
 func copyFile(src, dest string) error {
@@ -417,14 +398,6 @@ func moveDir(src string, dest string) error {
 	}
 
 	return os.RemoveAll(src)
-}
-
-func parseStringCell(f *excelize.File, listName string, cellName string) string {
-	cell, err := f.GetCellValue(listName, cellName)
-	if err != nil {
-		cell = err.Error()
-	}
-	return cell
 }
 
 func parseDateCell(f *excelize.File, listName string, cellName string) (string, error) {
