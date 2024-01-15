@@ -6,7 +6,7 @@ Staff-Robot an automated bot that parse excel and json files in current director
 
 Clone the repository, install Golang and dependencies from `go.mod`.
 Build binary:
-- `go build -ldflags="-s -w" -o parser .` for linux
+- `go build -ldflags="-s -w" -o robot.exe .` for linux
 Run binary:
 - `./parser` for linux
 

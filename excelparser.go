@@ -118,7 +118,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 				continue
 			}
 			anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
-			anketa.birthday, _ = f.GetCellValue("Лист1", "C8")
+			anketa.birthday, _ = parseDateCell(f, "Лист1", "C8")
 			if err != nil {
 				anketa.birthday = "2006-01-02"
 			}
@@ -138,7 +138,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 					}
 					anketa.fullname = strings.ToTitle(strings.Join(strings.Fields(name), " "))
 					anketa.previous, _ = f.GetCellValue("Лист2", "S3")
-					anketa.birthday, _ = f.GetCellValue("Лист2", "L3")
+					anketa.birthday, _ = parseDateCell(f, "Лист2", "L3")
 					if err != nil {
 						anketa.birthday = "2006-01-02"
 					}
