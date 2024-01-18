@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -25,6 +26,7 @@ const (
 
 var currentPath, _ = os.Getwd()
 var basePath string = filepath.Join(currentPath, "..")
+var logfile string = filepath.Join(basePath, "log.log")
 var databaseURI string = filepath.Join(basePath, database)
 var workDir string = filepath.Join(basePath, "Кандидаты")
 var workPath string = filepath.Join(workDir, workFile)
@@ -33,6 +35,18 @@ var archiveDir string = filepath.Join(basePath, "Персонал", "Персо�
 
 func main() {
 	now := time.Now()
+
+	fileLog, err := os.OpenFile(
+		logfile,
+		os.O_RDWR|os.O_CREATE|os.O_APPEND,
+		0666,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fileLog.Close()
+
+	log.SetOutput(fileLog)
 
 	workFileStat, err := os.Stat(workPath)
 	if err != nil {
@@ -46,10 +60,10 @@ func main() {
 	}
 	infoFileDate := infoFileStat.ModTime().Format("2006-01-02")
 
-	var resultMainFile int
-	var resultInfoFile int
-
 	timeNow := now.Format("2006-01-02")
+
+	chanMainFile := make(chan int)
+	chanInfoFile := make(chan int)
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
 		err := copyFile(databaseURI, filepath.Join(archiveDir, database))
@@ -68,7 +82,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			resultMainFile = parseMainFile(db)
+			go parseMainFile(db, chanMainFile)
 		}
 
 		if timeNow == infoFileDate {
@@ -76,14 +90,24 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			resultInfoFile = parseInfoFile(db)
+			go parseInfoFile(db, chanInfoFile)
 		}
+	}
+
+	var resultMainFile int
+	var resultInfoFile int
+
+	if timeNow == workFileDate {
+		resultMainFile = <-chanMainFile
+	}
+	if timeNow == infoFileDate {
+		resultInfoFile = <-chanInfoFile
 	}
 	log.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
 		resultMainFile, resultInfoFile, time.Since(now).Milliseconds())
 }
 
-func parseInfoFile(db *sql.DB) int {
+func parseInfoFile(db *sql.DB, ch chan int) {
 
 	stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 	if err != nil {
@@ -129,15 +153,15 @@ func parseInfoFile(db *sql.DB) int {
 	}
 
 	for _, num := range numRows {
+		var candId int
+		info, _ := f.GetCellValue("Лист1", fmt.Sprintf("E%d", num))
+		initiattor, _ := f.GetCellValue("Лист1", fmt.Sprintf("F%d", num))
+		name, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
+		fullName := strings.ToTitle(name)
 		birth, err := parseDateCell(f, "Лист1", fmt.Sprintf("B%d", num))
 		if err != nil {
 			birth = "2006-01-02"
 		}
-
-		var candId int
-		info, _ := f.GetCellValue("Лист1", fmt.Sprintf("E%d", num))
-		initiattor, _ := f.GetCellValue("Лист1", fmt.Sprintf("F%d", num))
-		fullName, _ := f.GetCellValue("Лист1", fmt.Sprintf("A%d", num))
 		birthDay := birth
 		deadLine := time.Now()
 
@@ -179,10 +203,10 @@ func parseInfoFile(db *sql.DB) int {
 			log.Println(err)
 		}
 	}
-	return len(numRows)
+	ch <- len(numRows)
 }
 
-func parseMainFile(db *sql.DB) int {
+func parseMainFile(db *sql.DB, ch chan int) {
 	f, err := excelize.OpenFile(workPath)
 	if err != nil {
 		log.Fatal(err)
@@ -248,47 +272,68 @@ func parseMainFile(db *sql.DB) int {
 			}
 		}
 
+		chanExcelFile := make(chan int)
+		chanJsonFile := make(chan int)
+
 		if len(excelPaths) > 0 {
-			excelParse(db, &excelPaths, &excelFiles)
+			go excelParse(db, &excelPaths, &excelFiles, chanExcelFile)
 		}
 		if len(jsonPaths) > 0 {
-			jsonParse(db, &jsonPaths)
+			go jsonParse(db, &jsonPaths, chanJsonFile)
 		}
+
+		var parseExcel int
+		var parseJson int
+
+		if len(excelPaths) > 0 {
+			parseExcel = <-chanExcelFile
+		}
+		if len(jsonPaths) > 0 {
+			parseJson = <-chanJsonFile
+		}
+
+		log.Printf("%d excel files and %d json files successfully parsed",
+			parseExcel, parseJson)
+
+		var wg sync.WaitGroup
 
 		for _, num := range numRows {
 			for _, sub := range subdir {
-				cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-
-				if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(sub)) {
-					id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
-					if err != nil {
-						id = fmt.Sprintf("999%d", num)
-					}
-
-					firstChar := string([]rune(cell)[:1])
-					lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
-					err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
-						Display: &lnk,
-						Tooltip: &cell,
-					})
-					if err != nil {
-						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
-					}
-					f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
-
-					subPath := filepath.Join(workDir, sub)
-					err = moveDir(subPath, lnk)
+				wg.Add(1)
+				go func(numb int, subd string) {
+					cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", numb))
 					if err != nil {
 						log.Println(err)
-						continue
 					}
-				}
+
+					if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(subd)) {
+						id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", numb))
+						if err != nil {
+							id = fmt.Sprintf("999%d", numb)
+						}
+
+						firstChar := string([]rune(cell)[:1])
+						lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
+						err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", numb), lnk, "External", excelize.HyperlinkOpts{
+							Display: &lnk,
+							Tooltip: &cell,
+						})
+						if err != nil {
+							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", numb), err.Error())
+						}
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", numb), lnk)
+
+						subPath := filepath.Join(workDir, subd)
+						err = moveDir(subPath, lnk)
+						if err != nil {
+							log.Println(err)
+						}
+					}
+					wg.Done()
+				}(num, sub)
 			}
 		}
+		wg.Wait()
 
 		stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 		if err != nil {
@@ -346,7 +391,7 @@ func parseMainFile(db *sql.DB) int {
 		}
 		f.SaveAs(filepath.Join(workDir, workFile))
 	}
-	return len(numRows)
+	ch <- len(numRows)
 }
 
 func copyFile(src, dest string) error {

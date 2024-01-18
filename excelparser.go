@@ -50,7 +50,7 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
+func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan int) {
 	stmtUpdatePerson, err := db.Prepare(
 		"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
 	)
@@ -110,8 +110,8 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 			log.Println(err)
 			continue
 		}
-
 		defer f.Close()
+
 		if strings.HasPrefix(file, "Заключение") {
 			name, _ := f.GetCellValue("Лист1", "C6")
 			if name == "" {
@@ -314,4 +314,5 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) {
 			}
 		}
 	}
+	ch <- len(*excelFiles)
 }
