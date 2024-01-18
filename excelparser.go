@@ -196,9 +196,10 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 			if err != nil {
 				if err == sql.ErrNoRows {
 					result, err := stmtInsertPerson.Exec(
-						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace,
-						anketa.country, anketa.snils, anketa.inn, anketa.education,
-						time.Now(), categoryId, regionId, statusId,
+						anketa.fullname, anketa.previous, anketa.birthday,
+						anketa.birthplace, anketa.country, anketa.snils,
+						anketa.inn, anketa.education, time.Now(),
+						categoryId, regionId, statusId,
 					)
 					if err != nil {
 						log.Println(err)

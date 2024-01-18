@@ -223,8 +223,10 @@ func jsonParse(db *sql.DB, jsonPaths *[]string, ch chan int) {
 			continue
 		}
 
-		_, err = stmtInsertDocument.Exec("Паспорт", person.PassportSerial,
-			person.PassportNumber, person.PassportIssueDate, person.PassportIssuedBy, candId)
+		_, err = stmtInsertDocument.Exec(
+			"Паспорт", person.PassportSerial, person.PassportNumber,
+			person.PassportIssueDate, person.PassportIssuedBy, candId,
+		)
 		if err != nil {
 			log.Println(err)
 			continue
