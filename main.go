@@ -335,7 +335,6 @@ func parseMainFile(db *sql.DB, ch chan int) {
 					}(num, sub)
 				}
 			}
-			wg.Wait()
 
 			stmtSelectPerson, err := db.Prepare("SELECT id FROM persons WHERE fullname = ? AND birthday = ?")
 			if err != nil {
@@ -394,6 +393,7 @@ func parseMainFile(db *sql.DB, ch chan int) {
 					}
 				}
 			}
+			wg.Wait()
 			f.SaveAs(filepath.Join(workDir, workFile))
 		}
 	}
