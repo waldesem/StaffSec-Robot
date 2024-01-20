@@ -26,7 +26,7 @@ const (
 
 var currentPath, _ = os.Getwd()
 var basePath string = filepath.Join(currentPath, "..")
-var logfile string = filepath.Join(basePath, "log.log")
+var logfile string = filepath.Join(basePath, "robot.log")
 var databaseURI string = filepath.Join(basePath, database)
 var workDir string = filepath.Join(basePath, "Кандидаты")
 var workPath string = filepath.Join(workDir, workFile)
@@ -34,13 +34,14 @@ var infoPath string = filepath.Join(workDir, infoFile)
 var archiveDir string = filepath.Join(basePath, "Персонал", "Персонал-2")
 
 func main() {
-	err := logError()
+	fileLog, err := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer fileLog.Close()
+	log.SetOutput(fileLog)
 
 	now := time.Now()
-	timeNow := now.Format("2006-01-02")
 
 	workFileDate, err := getFileDate(workPath)
 	if err != nil {
@@ -52,20 +53,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	resultMainFile, resultInfoFile := chansHandler(timeNow, workFileDate, infoFileDate)
+	resultMainFile, resultInfoFile := chansHandler(now, workFileDate, infoFileDate)
 
 	log.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
 		resultMainFile, resultInfoFile, time.Since(now).Milliseconds())
-}
-
-func logError() error {
-	fileLog, err := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, os.ModePerm)
-	if err != nil {
-		return err
-	}
-	defer fileLog.Close()
-	log.SetOutput(fileLog)
-	return nil
 }
 
 func getFileDate(path string) (string, error) {
@@ -76,7 +67,9 @@ func getFileDate(path string) (string, error) {
 	return stat.ModTime().Format("2006-01-02"), nil
 }
 
-func chansHandler(timeNow string, workFileDate string, infoFileDate string) (int, int) {
+func chansHandler(now time.Time, workFileDate string, infoFileDate string) (int, int) {
+	timeNow := now.Format("2006-01-02")
+
 	chanMain, chanInfo := make(chan int), make(chan int)
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
@@ -134,7 +127,7 @@ func parseInfoFile(db *sql.DB, ch chan int) {
 	defer f.Close()
 
 	var numRows []int
-	for i := 1; i < 10000; i++ {
+	for i := 1; i < 2000; i++ {
 		t, err := parseDateCell(f, "Лист1", fmt.Sprintf("G%d", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
 			numRows = append(numRows, i)
@@ -198,7 +191,7 @@ func parseMainFile(db *sql.DB, ch chan int) {
 	defer f.Close()
 
 	var numRows = make([]int, 0)
-	for i := 1; i < 100000; i++ {
+	for i := 1; i < 20000; i++ {
 		t, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
 			numRows = append(numRows, i)
