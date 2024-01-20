@@ -127,7 +127,7 @@ func parseInfoFile(db *sql.DB, ch chan int) {
 	defer f.Close()
 
 	var numRows []int
-	for i := 1; i < 2000; i++ {
+	for i := 1; i < 5000; i++ {
 		t, err := parseDateCell(f, "Лист1", fmt.Sprintf("G%d", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
 			numRows = append(numRows, i)
@@ -191,7 +191,7 @@ func parseMainFile(db *sql.DB, ch chan int) {
 	defer f.Close()
 
 	var numRows = make([]int, 0)
-	for i := 1; i < 20000; i++ {
+	for i := 1; i < 50000; i++ {
 		t, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
 			numRows = append(numRows, i)
