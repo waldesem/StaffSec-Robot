@@ -259,6 +259,7 @@ func parseMainFile(db *sql.DB) int {
 				for _, sub := range subdir {
 					wg.Add(1)
 					go func(numb int, subd string) {
+						defer wg.Done()
 						cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", numb))
 						if err != nil {
 							log.Println(err)
@@ -287,7 +288,6 @@ func parseMainFile(db *sql.DB) int {
 								log.Println(err)
 							}
 						}
-						wg.Done()
 					}(num, sub)
 				}
 			}

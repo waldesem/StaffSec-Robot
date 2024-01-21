@@ -69,53 +69,6 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) int {
 		defer stmt.Close()
 		stmts[key] = stmt
 	}
-	// stmtUpdatePerson, err := db.Prepare(
-	// 	"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtUpdatePerson.Close()
-
-	// stmtShortUpdatePerson, err := db.Prepare(
-	// 	"UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtUpdatePerson.Close()
-
-	// stmtShortInsertPerson, err := db.Prepare(
-	// 	"INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtShortInsertPerson.Close()
-
-	// stmtInsertPerson, err := db.Prepare(
-	// 	"INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtInsertPerson.Close()
-
-	// stmtInsertCheck, err := db.Prepare(
-	// 	"INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtInsertCheck.Close()
-
-	// stmtInsertRobot, err := db.Prepare(
-	// 	"INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	// )
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer stmtInsertRobot.Close()
 
 	for idx, file := range *excelFiles {
 		var candId int
