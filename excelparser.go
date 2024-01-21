@@ -50,54 +50,72 @@ type Robot struct {
 	bki        string
 }
 
-func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan int) {
-	stmtUpdatePerson, err := db.Prepare(
-		"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
-	)
-	if err != nil {
-		log.Fatal(err)
+func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string) int {
+	queries := map[string]string{
+		"updatePerson":      "UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
+		"updateShortPerson": "UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
+		"insertShortPerson": "INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+		"insertPerson":      "INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"insertCheck":       "INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"insertRobot":       "INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	}
-	defer stmtUpdatePerson.Close()
 
-	stmtShortUpdatePerson, err := db.Prepare(
-		"UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
-	)
-	if err != nil {
-		log.Fatal(err)
+	stmts := make(map[string]*sql.Stmt)
+	for key, query := range queries {
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+		stmts[key] = stmt
 	}
-	defer stmtUpdatePerson.Close()
+	// stmtUpdatePerson, err := db.Prepare(
+	// 	"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, snils = ?, inn = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtUpdatePerson.Close()
 
-	stmtShortInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtShortInsertPerson.Close()
+	// stmtShortUpdatePerson, err := db.Prepare(
+	// 	"UPDATE persons SET fullname = ?, birthday = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtUpdatePerson.Close()
 
-	stmtInsertPerson, err := db.Prepare(
-		"INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertPerson.Close()
+	// stmtShortInsertPerson, err := db.Prepare(
+	// 	"INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtShortInsertPerson.Close()
 
-	stmtInsertCheck, err := db.Prepare(
-		"INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertCheck.Close()
+	// stmtInsertPerson, err := db.Prepare(
+	// 	"INSERT INTO persons (fullname, previous, birthday, birthplace, country, snils, inn, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtInsertPerson.Close()
 
-	stmtInsertRobot, err := db.Prepare(
-		"INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmtInsertRobot.Close()
+	// stmtInsertCheck, err := db.Prepare(
+	// 	"INSERT INTO checks (workplace, cronos, cros, document, debt, bankruptcy, bki, affilation, internet, pfo, addition, conclusion, officer, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtInsertCheck.Close()
+
+	// stmtInsertRobot, err := db.Prepare(
+	// 	"INSERT INTO robots (inn, employee, terrorist, mvd, courts, bankruptcy, bki, deadline, person_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	// )
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmtInsertRobot.Close()
 
 	for idx, file := range *excelFiles {
 		var candId int
@@ -195,7 +213,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 			err = result.Scan(&candId)
 			if err != nil {
 				if err == sql.ErrNoRows {
-					result, err := stmtInsertPerson.Exec(
+					result, err := stmts["insertPerson"].Exec(
 						anketa.fullname, anketa.previous, anketa.birthday,
 						anketa.birthplace, anketa.country, anketa.snils,
 						anketa.inn, anketa.education, time.Now(),
@@ -218,7 +236,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 
 			} else {
 				if fio == "" {
-					_, err := stmtUpdatePerson.Exec(
+					_, err := stmts["updatePerson"].Exec(
 						anketa.fullname, anketa.previous, anketa.birthday, anketa.birthplace,
 						anketa.country, anketa.snils, anketa.inn, anketa.education,
 						time.Now(), categoryId, regionId, statusId, candId,
@@ -228,7 +246,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 						continue
 					}
 				} else {
-					_, err := stmtShortUpdatePerson.Exec(
+					_, err := stmts["updateShortPerson"].Exec(
 						anketa.fullname, anketa.birthday, time.Now(), categoryId,
 						regionId, statusId, candId,
 					)
@@ -240,7 +258,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 
 			}
 
-			_, err = stmtInsertCheck.Exec(
+			_, err = stmts["insertCheck"].Exec(
 				check.workplace, check.cronos, check.cros, check.document, check.debt,
 				check.bankruptcy, check.bki, check.affilation, check.internet,
 				check.pfo, check.addition, check.conclusion, check.officer, time.Now(), candId,
@@ -277,7 +295,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 			err = result.Scan(&candId)
 			if err != nil {
 				if err == sql.ErrNoRows {
-					result, err := stmtShortInsertPerson.Exec(
+					result, err := stmts["insertShortPerson"].Exec(
 						anketa.fullname, anketa.birthday, time.Now(),
 						categoryId, regionId, statusId,
 					)
@@ -297,7 +315,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 				}
 
 			} else {
-				_, err := stmtShortUpdatePerson.Exec(
+				_, err := stmts["updateShortPerson"].Exec(
 					anketa.fullname, anketa.birthday, time.Now(),
 					categoryId, regionId, statusId, candId,
 				)
@@ -307,7 +325,7 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 				}
 			}
 
-			_, err = stmtInsertRobot.Exec(robot.inn, robot.employee, robot.terrorist,
+			_, err = stmts["insertRobot"].Exec(robot.inn, robot.employee, robot.terrorist,
 				robot.mvd, robot.courts, robot.bankruptcy, robot.bki, time.Now(), candId)
 			if err != nil {
 				log.Println(err)
@@ -315,5 +333,5 @@ func excelParse(db *sql.DB, excelPaths *[]string, excelFiles *[]string, ch chan 
 			}
 		}
 	}
-	ch <- len(*excelFiles)
+	return len(*excelFiles)
 }

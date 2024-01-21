@@ -94,7 +94,7 @@ type Person struct {
 	Organizations                     []Organization `json:"organizations"`
 }
 
-func jsonParse(db *sql.DB, jsonPaths *[]string, ch chan int) {
+func jsonParse(db *sql.DB, jsonPaths *[]string) int {
 	stmtUpdatePerson, err := db.Prepare(
 		"UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
 	)
@@ -277,7 +277,7 @@ func jsonParse(db *sql.DB, jsonPaths *[]string, ch chan int) {
 			}
 		}
 	}
-	ch <- len(*jsonPaths)
+	return len(*jsonPaths)
 }
 
 func (person Person) parseFullname() string {

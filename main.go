@@ -53,24 +53,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	resultMainFile, resultInfoFile := chansHandler(now, workFileDate, infoFileDate)
-
-	log.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
-		resultMainFile, resultInfoFile, time.Since(now).Milliseconds())
-}
-
-func getFileDate(path string) (string, error) {
-	stat, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-	return stat.ModTime().Format("2006-01-02"), nil
-}
-
-func chansHandler(now time.Time, workFileDate string, infoFileDate string) (int, int) {
 	timeNow := now.Format("2006-01-02")
 
-	chanMain, chanInfo := make(chan int), make(chan int)
+	var resultMainFile, resultInfoFile int
 
 	if timeNow == workFileDate || timeNow == infoFileDate {
 		err := copyFile(databaseURI, filepath.Join(archiveDir, database))
@@ -89,7 +74,7 @@ func chansHandler(now time.Time, workFileDate string, infoFileDate string) (int,
 			if err != nil {
 				log.Fatal(err)
 			}
-			go parseMainFile(db, chanMain)
+			resultMainFile = parseMainFile(db)
 		}
 
 		if timeNow == infoFileDate {
@@ -97,22 +82,23 @@ func chansHandler(now time.Time, workFileDate string, infoFileDate string) (int,
 			if err != nil {
 				log.Fatal(err)
 			}
-			go parseInfoFile(db, chanInfo)
+			resultInfoFile = parseInfoFile(db)
 		}
 	}
 
-	var resultMainFile, resultInfoFile int
-
-	if timeNow == workFileDate {
-		resultMainFile = <-chanMain
-	}
-	if timeNow == infoFileDate {
-		resultInfoFile = <-chanInfo
-	}
-	return resultMainFile, resultInfoFile
+	log.Printf("%d rows in MainFile and %d rows in InfoFile successfully scaned in %d ms",
+		resultMainFile, resultInfoFile, time.Since(now).Milliseconds())
 }
 
-func parseInfoFile(db *sql.DB, ch chan int) {
+func getFileDate(path string) (string, error) {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	return stat.ModTime().Format("2006-01-02"), nil
+}
+
+func parseInfoFile(db *sql.DB) int {
 	queries := map[string]string{
 		"selectPerson":  "SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
 		"insertPerson":  "INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -147,7 +133,16 @@ func parseInfoFile(db *sql.DB, ch chan int) {
 		deadLine := time.Now()
 
 		var candId int
-		stmts := stmtsQuery(db, queries)
+		stmts := make(map[string]*sql.Stmt)
+		for key, query := range queries {
+			stmt, err := db.Prepare(query)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer stmt.Close()
+			stmts[key] = stmt
+		}
+
 		row := stmts["selectPerson"].QueryRow(fullName, birthDay)
 		err = row.Scan(&candId)
 
@@ -177,13 +172,13 @@ func parseInfoFile(db *sql.DB, ch chan int) {
 
 		_, err = stmts["insertInquiry"].Exec(info, init, deadLine, candId)
 		if err != nil {
-			log.Println(err)
+			log.Println("error5", err)
 		}
 	}
-	ch <- len(numRows)
+	return len(numRows)
 }
 
-func parseMainFile(db *sql.DB, ch chan int) {
+func parseMainFile(db *sql.DB) int {
 	f, err := excelize.OpenFile(workPath)
 	if err != nil {
 		log.Fatal(err)
@@ -247,23 +242,12 @@ func parseMainFile(db *sql.DB, ch chan int) {
 				}
 			}
 
-			chanExcel, chanJson := make(chan int), make(chan int)
-
+			var parseExcel, parseJson int
 			if len(excelPaths) > 0 {
-				go excelParse(db, &excelPaths, &excelFiles, chanExcel)
+				parseExcel = excelParse(db, &excelPaths, &excelFiles)
 			}
 			if len(jsonPaths) > 0 {
-				go jsonParse(db, &jsonPaths, chanJson)
-			}
-
-			var parseExcel int
-			var parseJson int
-
-			if len(excelPaths) > 0 {
-				parseExcel = <-chanExcel
-			}
-			if len(jsonPaths) > 0 {
-				parseJson = <-chanJson
+				parseJson = jsonParse(db, &jsonPaths)
 			}
 
 			log.Printf("%d excel files and %d json files successfully parsed",
@@ -313,7 +297,16 @@ func parseMainFile(db *sql.DB, ch chan int) {
 				"updatePerson": "UPDATE persons SET path = ?, updated = ? WHERE id = ?",
 			}
 
-			stmts := stmtsQuery(db, queries)
+			stmts := make(map[string]*sql.Stmt)
+			for key, query := range queries {
+				stmt, err := db.Prepare(query)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer stmt.Close()
+				stmts[key] = stmt
+			}
+
 			for _, num := range numRows {
 				var candId int
 
@@ -327,7 +320,7 @@ func parseMainFile(db *sql.DB, ch chan int) {
 				row := stmts["selectPerson"].QueryRow(fullname, birthday)
 				err = row.Scan(&candId)
 				if err != nil && err != sql.ErrNoRows {
-					log.Println(err)
+					log.Println("Error1: ", err)
 					continue
 				}
 
@@ -355,21 +348,7 @@ func parseMainFile(db *sql.DB, ch chan int) {
 			f.SaveAs(filepath.Join(workDir, workFile))
 		}
 	}
-	ch <- len(numRows)
-}
-
-func stmtsQuery(db *sql.DB, queries map[string]string) map[string]*sql.Stmt {
-	stmts := make(map[string]*sql.Stmt)
-	for key, query := range queries {
-		stmt, err := db.Prepare(query)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-		stmts[key] = stmt
-	}
-	return stmts
-
+	return len(numRows)
 }
 
 func copyFile(src, dest string) error {
