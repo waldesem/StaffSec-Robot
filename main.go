@@ -194,160 +194,126 @@ func parseMainFile(db *sql.DB) int {
 	}
 
 	if len(numRows) > 0 {
-		fio := make([]string, 0)
-		for _, num := range numRows {
-			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+		queries := map[string]string{
+			"selectPerson": "SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+			"insertPerson": "INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			"updatePerson": "UPDATE persons SET path = ?, updated = ? WHERE id = ?",
+		}
+
+		stmts := make(map[string]*sql.Stmt)
+		for key, query := range queries {
+			stmt, err := db.Prepare(query)
 			if err != nil {
-				log.Println(err)
-				continue
+				log.Fatal(err)
 			}
-			fio = append(fio, strings.TrimSpace(cell))
+			defer stmt.Close()
+			stmts[key] = stmt
 		}
 
 		workDirs, err := os.ReadDir(workDir)
 		if err != nil {
-			log.Println(err)
+			log.Fatal(err)
 		}
 
-		subdir := make([]string, 0)
-		for _, dir := range workDirs {
-			for _, name := range fio {
-				if strings.EqualFold(dir.Name(), name) {
-					subdir = append(subdir, dir.Name())
-					break
-				}
-			}
-		}
+		var wg sync.WaitGroup
+		for _, num := range numRows {
+			wg.Add(1)
+			go func(num int) {
+				defer wg.Done()
 
-		if len(subdir) > 0 {
-			var excelPaths, excelFiles, jsonPaths []string
-
-			for _, sub := range subdir {
-				subdirPath := filepath.Join(workDir, sub)
-				workSubDirs, err := os.ReadDir(subdirPath)
+				cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 				if err != nil {
 					log.Println(err)
-					continue
+					return
 				}
-				for _, file := range workSubDirs {
-					switch {
-					case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
-						(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
-						excelPaths = append(excelPaths, subdirPath)
-						excelFiles = append(excelFiles, file.Name())
 
-					case strings.HasSuffix(file.Name(), "json"):
-						jsonPaths = append(jsonPaths, filepath.Join(subdirPath, file.Name()))
-					}
-				}
-			}
+				for _, dir := range workDirs {
+					if strings.EqualFold(dir.Name(), cell) {
 
-			var parseExcel, parseJson int
-			if len(excelPaths) > 0 {
-				parseExcel = excelParse(db, &excelPaths, &excelFiles)
-			}
-			if len(jsonPaths) > 0 {
-				parseJson = jsonParse(db, &jsonPaths)
-			}
+						subdirPath := filepath.Join(workDir, cell)
+						filesDirs, err := os.ReadDir(subdirPath)
+						if err != nil {
+							log.Println(err)
+							continue
+						}
 
-			log.Printf("%d excel files and %d json files successfully parsed",
-				parseExcel, parseJson)
+						for _, file := range filesDirs {
+							switch {
+							case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
+								(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
+								excelParse(db, subdirPath, file.Name())
 
-			var wg sync.WaitGroup
+							case strings.HasSuffix(file.Name(), "json"):
+								jsonParse(db, subdirPath, file.Name())
+							}
+						}
 
-			for _, num := range numRows {
-				for _, sub := range subdir {
-					wg.Add(1)
-					go func(numb int, subd string) {
-						defer wg.Done()
-						cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", numb))
+						id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
+						if err != nil {
+							id = fmt.Sprintf("999%d", num)
+						}
+
+						firstChar := string([]rune(cell)[:1])
+						lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
+						err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
+							Display: &lnk,
+							Tooltip: &cell,
+						})
+						if err != nil {
+							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
+						} else {
+							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+						}
+
+						err = moveDir(subdirPath, lnk)
 						if err != nil {
 							log.Println(err)
 						}
 
-						if strings.EqualFold(strings.TrimSpace(cell), strings.TrimSpace(subd)) {
-							id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", numb))
-							if err != nil {
-								id = fmt.Sprintf("999%d", numb)
-							}
+						var candId int
 
-							firstChar := string([]rune(cell)[:1])
-							lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
-							err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", numb), lnk, "External", excelize.HyperlinkOpts{
-								Display: &lnk,
-								Tooltip: &cell,
-							})
-							if err != nil {
-								f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", numb), err.Error())
-							}
-							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", numb), lnk)
+						url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+						name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+						fullname := strings.ToTitle(name)
+						birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
+						if err != nil {
+							birthday = "2006-01-02"
+						}
+						row := stmts["selectPerson"].QueryRow(fullname, birthday)
+						err = row.Scan(&candId)
+						if err != nil && err != sql.ErrNoRows {
+							log.Println("Error1: ", err)
+							continue
+						}
 
-							subPath := filepath.Join(workDir, subd)
-							err = moveDir(subPath, lnk)
+						if err == sql.ErrNoRows {
+							result, err := stmts["insertPerson"].Exec(
+								fullname, birthday, time.Now(), url,
+								categoryId, regionId, statusId,
+							)
 							if err != nil {
 								log.Println(err)
+								continue
+							}
+
+							id, _ := result.LastInsertId()
+							candId = int(id)
+
+						} else {
+							_, err = stmts["updatePerson"].Exec(url, time.Now(), candId)
+							if err != nil {
+								log.Println(err)
+								continue
 							}
 						}
-					}(num, sub)
-				}
-			}
-			queries := map[string]string{
-				"selectPerson": "SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
-				"insertPerson": "INSERT INTO persons (fullname, birthday, created, path, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-				"updatePerson": "UPDATE persons SET path = ?, updated = ? WHERE id = ?",
-			}
 
-			stmts := make(map[string]*sql.Stmt)
-			for key, query := range queries {
-				stmt, err := db.Prepare(query)
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer stmt.Close()
-				stmts[key] = stmt
-			}
-
-			for _, num := range numRows {
-				var candId int
-
-				url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-				name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-				fullname := strings.ToTitle(name)
-				birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
-				if err != nil {
-					birthday = "2006-01-02"
-				}
-				row := stmts["selectPerson"].QueryRow(fullname, birthday)
-				err = row.Scan(&candId)
-				if err != nil && err != sql.ErrNoRows {
-					log.Println("Error1: ", err)
-					continue
-				}
-
-				if err == sql.ErrNoRows {
-					result, err := stmts["insertPerson"].Exec(
-						fullname, birthday, time.Now(), url,
-						categoryId, regionId, statusId,
-					)
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					id, _ := result.LastInsertId()
-					candId = int(id)
-
-				} else {
-					_, err = stmts["updatePerson"].Exec(url, time.Now(), candId)
-					if err != nil {
-						log.Println(err)
-						continue
 					}
 				}
-			}
-			wg.Wait()
-			f.SaveAs(filepath.Join(workDir, workFile))
+			}(num)
 		}
+		wg.Wait()
 	}
+	f.SaveAs(filepath.Join(workDir, workFile))
 	return len(numRows)
 }
 

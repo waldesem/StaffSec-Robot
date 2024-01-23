@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -94,7 +95,7 @@ type Person struct {
 	Organizations                     []Organization `json:"organizations"`
 }
 
-func jsonParse(db *sql.DB, jsonPaths *[]string) int {
+func jsonParse(db *sql.DB, jsonPath string, jsonFile string) {
 	queries := map[string]string{
 		"stmtUpdatePerson":      "UPDATE persons SET fullname = ?, previous = ?, birthday = ?, birthplace = ?, country = ?, ext_country = ?, snils = ?, inn = ?, marital = ?, education = ?, updated = ?, category_id = ?, region_id = ?, status_id = ? WHERE id = ?",
 		"stmtInsertPerson":      "INSERT INTO persons (fullname, previous, birthday, birthplace, country, ext_country, snils, inn, marital, education, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -115,125 +116,122 @@ func jsonParse(db *sql.DB, jsonPaths *[]string) int {
 		stmts[key] = stmt
 	}
 
-	for _, path := range *jsonPaths {
-		f, err := os.ReadFile(path)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+	f, err := os.ReadFile(filepath.Join(jsonPath, jsonFile))
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
-		var candId int
-		var person Person
+	var candId int
+	var person Person
 
-		err = json.Unmarshal(f, &person)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+	err = json.Unmarshal(f, &person)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
-		result := db.QueryRow(
-			"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
-			person.parseFullname(), person.Birthday,
-		)
-		err = result.Scan(&candId)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				ins, err := stmts["stmtInsertPerson"].Exec(
-					person.parseFullname(), person.parsePrevious(), person.Birthday,
-					person.Birthplace, person.Citizen, person.AdditionalCitizenship,
-					person.Snils, person.Inn, person.MaritalStatus,
-					person.parseEducation(), time.Now(), categoryId, regionId, statusId,
-				)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				id, err := ins.LastInsertId()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				candId = int(id)
-
-			} else {
-				log.Println(err)
-				continue
-			}
-
-		} else {
-			_, err := stmts["stmtUpdatePerson"].Exec(
+	result := db.QueryRow(
+		"SELECT id FROM persons WHERE fullname = ? AND birthday = ?",
+		person.parseFullname(), person.Birthday,
+	)
+	err = result.Scan(&candId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			ins, err := stmts["stmtInsertPerson"].Exec(
 				person.parseFullname(), person.parsePrevious(), person.Birthday,
 				person.Birthplace, person.Citizen, person.AdditionalCitizenship,
-				person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(),
-				time.Now(), categoryId, regionId, statusId, candId,
+				person.Snils, person.Inn, person.MaritalStatus,
+				person.parseEducation(), time.Now(), categoryId, regionId, statusId,
 			)
 			if err != nil {
 				log.Println(err)
-				continue
+				return
 			}
+			id, err := ins.LastInsertId()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			candId = int(id)
+
+		} else {
+			log.Println(err)
+			return
 		}
 
-		_, err = stmts["stmtInsertStaff"].Exec(person.PositionName, person.Department, candId)
+	} else {
+		_, err := stmts["stmtUpdatePerson"].Exec(
+			person.parseFullname(), person.parsePrevious(), person.Birthday,
+			person.Birthplace, person.Citizen, person.AdditionalCitizenship,
+			person.Snils, person.Inn, person.MaritalStatus, person.parseEducation(),
+			time.Now(), categoryId, regionId, statusId, candId,
+		)
 		if err != nil {
 			log.Println(err)
-			continue
+			return
 		}
+	}
 
-		_, err = stmts["stmtInsertDocument"].Exec(
-			"Паспорт", person.PassportSerial, person.PassportNumber,
-			person.PassportIssueDate, person.PassportIssuedBy, candId,
+	_, err = stmts["stmtInsertStaff"].Exec(person.PositionName, person.Department, candId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = stmts["stmtInsertDocument"].Exec(
+		"Паспорт", person.PassportSerial, person.PassportNumber,
+		person.PassportIssueDate, person.PassportIssuedBy, candId,
+	)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = stmts["stmtInsertAddress"].Exec("Адрес проживания", person.ValidAddress, candId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = stmts["stmtInsertAddress"].Exec("Адрес регистрации", person.RegAddress, candId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = stmts["stmtInsertContacts"].Exec("Телефон", person.ContactPhone, candId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = stmts["stmtInsertContacts"].Exec("Электронная почта", person.Email, candId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	for _, item := range person.parseAffilation() {
+		_, err = stmts["stmtInsertAffiliation"].Exec(
+			item.View, item.Name, item.Inn, item.Position, time.Now(), candId,
 		)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
+	}
 
-		_, err = stmts["stmtInsertAddress"].Exec("Адрес проживания", person.ValidAddress, candId)
+	for _, item := range person.parseWorkplace() {
+		_, err = stmts["stmtInsertWorkplace"].Exec(
+			item.BeginDate, item.EndDate, item.Name, item.Address,
+			item.Position, item.FireReason, candId,
+		)
 		if err != nil {
 			log.Println(err)
 			continue
-		}
-
-		_, err = stmts["stmtInsertAddress"].Exec("Адрес регистрации", person.RegAddress, candId)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		_, err = stmts["stmtInsertContacts"].Exec("Телефон", person.ContactPhone, candId)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		_, err = stmts["stmtInsertContacts"].Exec("Электронная почта", person.Email, candId)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		for _, item := range person.parseAffilation() {
-			_, err = stmts["stmtInsertAffiliation"].Exec(
-				item.View, item.Name, item.Inn, item.Position, time.Now(), candId,
-			)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-		}
-
-		for _, item := range person.parseWorkplace() {
-			_, err = stmts["stmtInsertWorkplace"].Exec(
-				item.BeginDate, item.EndDate, item.Name, item.Address,
-				item.Position, item.FireReason, candId,
-			)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
 		}
 	}
-	return len(*jsonPaths)
 }
 
 func (person Person) parseFullname() string {
