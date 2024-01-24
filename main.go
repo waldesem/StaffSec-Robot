@@ -178,14 +178,14 @@ func parseInfoFile(db *sql.DB) int {
 }
 
 func parseMainFile(db *sql.DB) int {
-	xlsm, err := excelize.OpenFile(workPath)
+	f, err := excelize.OpenFile(workPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var numRows = make([]int, 0)
 	for i := 10000; i < 50000; i++ {
-		t, err := parseDateCell(xlsm, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
+		t, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("%s%d", "K", i))
 		if err == nil && t == time.Now().Format("2006-01-02") {
 			numRows = append(numRows, i)
 		}
@@ -214,7 +214,7 @@ func parseMainFile(db *sql.DB) int {
 		}
 
 		for _, num := range numRows {
-			cell, err := xlsm.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 			if err != nil {
 				log.Println(err)
 				continue
@@ -241,21 +241,21 @@ func parseMainFile(db *sql.DB) int {
 						}
 					}
 
-					id, err := xlsm.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
+					id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
 					if err != nil {
 						id = fmt.Sprintf("999%d", num)
 					}
 
 					firstChar := string([]rune(cell)[:1])
 					lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
-					err = xlsm.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
+					err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
 						Display: &lnk,
 						Tooltip: &cell,
 					})
 					if err != nil {
-						xlsm.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
 					} else {
-						xlsm.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
 					}
 
 					err = moveDir(subdirPath, lnk)
@@ -265,10 +265,10 @@ func parseMainFile(db *sql.DB) int {
 
 					var candId int
 
-					url, _ := xlsm.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-					name, _ := xlsm.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+					url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+					name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
 					fullname := strings.ToTitle(name)
-					birthday, err := parseDateCell(xlsm, "Кандидаты", fmt.Sprintf("C%d", num))
+					birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
 					if err != nil {
 						birthday = "2006-01-02"
 					}
@@ -303,7 +303,7 @@ func parseMainFile(db *sql.DB) int {
 			}
 		}
 	}
-	err = xlsm.Save()
+	err = f.Save()
 	if err != nil {
 		log.Println(err)
 	}
