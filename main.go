@@ -265,13 +265,12 @@ func parseMainFile(db *sql.DB) int {
 
 					var candId int
 
-					url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-					name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-					fullname := strings.ToTitle(name)
+					fullname := strings.ToTitle(cell)
 					birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
 					if err != nil {
 						birthday = "2006-01-02"
 					}
+
 					row := stmts["selectPerson"].QueryRow(fullname, birthday)
 					err = row.Scan(&candId)
 					if err != nil && err != sql.ErrNoRows {
@@ -281,7 +280,7 @@ func parseMainFile(db *sql.DB) int {
 
 					if err == sql.ErrNoRows {
 						result, err := stmts["insertPerson"].Exec(
-							fullname, birthday, time.Now(), url,
+							fullname, birthday, time.Now(), lnk,
 							categoryId, regionId, statusId,
 						)
 						if err != nil {
@@ -293,7 +292,7 @@ func parseMainFile(db *sql.DB) int {
 						candId = int(id)
 
 					} else {
-						_, err = stmts["updatePerson"].Exec(url, time.Now(), candId)
+						_, err = stmts["updatePerson"].Exec(lnk, time.Now(), candId)
 						if err != nil {
 							log.Println(err)
 							continue
