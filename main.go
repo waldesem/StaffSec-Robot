@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -215,103 +214,95 @@ func parseMainFile(db *sql.DB) int {
 			log.Fatal(err)
 		}
 
-		var wg sync.WaitGroup
 		for _, num := range numRows {
-			wg.Add(1)
-			go func(num int) {
-				defer wg.Done()
+			cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 
-				cell, err := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-				if err != nil {
-					log.Println(err)
-					return
-				}
+			for _, dir := range workDirs {
+				if strings.EqualFold(dir.Name(), cell) {
 
-				for _, dir := range workDirs {
-					if strings.EqualFold(dir.Name(), cell) {
+					subdirPath := filepath.Join(workDir, cell)
+					filesDirs, err := os.ReadDir(subdirPath)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 
-						subdirPath := filepath.Join(workDir, cell)
-						filesDirs, err := os.ReadDir(subdirPath)
+					for _, file := range filesDirs {
+						switch {
+						case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
+							(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
+							excelParse(db, subdirPath, file.Name())
+
+						case strings.HasSuffix(file.Name(), "json"):
+							jsonParse(db, subdirPath, file.Name())
+						}
+					}
+
+					id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
+					if err != nil {
+						id = fmt.Sprintf("999%d", num)
+					}
+
+					firstChar := string([]rune(cell)[:1])
+					lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
+					err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
+						Display: &lnk,
+						Tooltip: &cell,
+					})
+					if err != nil {
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
+					} else {
+						f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
+					}
+
+					err = moveDir(subdirPath, lnk)
+					if err != nil {
+						log.Println(err)
+					}
+
+					var candId int
+
+					url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
+					name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
+					fullname := strings.ToTitle(name)
+					birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
+					if err != nil {
+						birthday = "2006-01-02"
+					}
+					row := stmts["selectPerson"].QueryRow(fullname, birthday)
+					err = row.Scan(&candId)
+					if err != nil && err != sql.ErrNoRows {
+						log.Println("Error1: ", err)
+						continue
+					}
+
+					if err == sql.ErrNoRows {
+						result, err := stmts["insertPerson"].Exec(
+							fullname, birthday, time.Now(), url,
+							categoryId, regionId, statusId,
+						)
 						if err != nil {
 							log.Println(err)
 							continue
 						}
 
-						for _, file := range filesDirs {
-							switch {
-							case (strings.HasPrefix(file.Name(), "Заключение") || strings.HasPrefix(file.Name(), "Результаты")) &&
-								(strings.HasSuffix(file.Name(), "xlsm") || strings.HasSuffix(file.Name(), "xlsx")):
-								excelParse(db, subdirPath, file.Name())
+						id, _ := result.LastInsertId()
+						candId = int(id)
 
-							case strings.HasSuffix(file.Name(), "json"):
-								jsonParse(db, subdirPath, file.Name())
-							}
-						}
-
-						id, err := f.GetCellValue("Кандидаты", fmt.Sprintf("A%d", num))
-						if err != nil {
-							id = fmt.Sprintf("999%d", num)
-						}
-
-						firstChar := string([]rune(cell)[:1])
-						lnk := filepath.Join(archiveDir, firstChar, fmt.Sprintf("%s-%s", cell, id))
-						err = f.SetCellHyperLink("Кандидаты", fmt.Sprintf("L%d", num), lnk, "External", excelize.HyperlinkOpts{
-							Display: &lnk,
-							Tooltip: &cell,
-						})
-						if err != nil {
-							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), err.Error())
-						} else {
-							f.SetCellValue("Кандидаты", fmt.Sprintf("L%d", num), lnk)
-						}
-
-						err = moveDir(subdirPath, lnk)
+					} else {
+						_, err = stmts["updatePerson"].Exec(url, time.Now(), candId)
 						if err != nil {
 							log.Println(err)
-						}
-
-						var candId int
-
-						url, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("L%d", num))
-						name, _ := f.GetCellValue("Кандидаты", fmt.Sprintf("B%d", num))
-						fullname := strings.ToTitle(name)
-						birthday, err := parseDateCell(f, "Кандидаты", fmt.Sprintf("C%d", num))
-						if err != nil {
-							birthday = "2006-01-02"
-						}
-						row := stmts["selectPerson"].QueryRow(fullname, birthday)
-						err = row.Scan(&candId)
-						if err != nil && err != sql.ErrNoRows {
-							log.Println("Error1: ", err)
 							continue
 						}
-
-						if err == sql.ErrNoRows {
-							result, err := stmts["insertPerson"].Exec(
-								fullname, birthday, time.Now(), url,
-								categoryId, regionId, statusId,
-							)
-							if err != nil {
-								log.Println(err)
-								continue
-							}
-
-							id, _ := result.LastInsertId()
-							candId = int(id)
-
-						} else {
-							_, err = stmts["updatePerson"].Exec(url, time.Now(), candId)
-							if err != nil {
-								log.Println(err)
-								continue
-							}
-						}
-
 					}
 				}
-			}(num)
+			}
 		}
-		wg.Wait()
 	}
 	f.SaveAs(filepath.Join(workDir, workFile))
 	return len(numRows)
