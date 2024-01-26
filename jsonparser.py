@@ -1,3 +1,4 @@
+import os
 import json
 import sqlite3
 from datetime import datetime
@@ -5,45 +6,45 @@ from datetime import datetime
 from config import Config
 
 
-def json_to_db(json_path):
-    for json_file in json_path:
-        json_data = JsonFile(json_file)
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
+def json_to_db(json_path, json_file):
+    json_data = JsonFile(os.path.join(json_path, json_file))
+    connection = sqlite3.connect(Config.DATABASE_URI)
+    with connection as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
+            (json_data.resume['fullname'], json_data.resume['birthday'])
+        )
+        result = cursor.fetchone()
+        person_id = result[0] if result else None
+    
+        if person_id:
             cursor.execute(
-                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-                (json_data.resume['fullname'], json_data.resume['birthday'])
+                f"UPDATE persons SET {'=?,'.join(json_data.resume['resume'].keys())},=? "
+                f"WHERE id = {person_id}",
+                tuple(json_data.resume['resume'].values())
             )
-            result = cursor.fetchone()
-            person_id = result[0] if result else None
+        else:
+            cursor.execute(
+                f"INSERT INTO persons ({','.join(json_data.resume.keys())}) "
+                f"VALUES ({','.join(['?'] * len(json_data.resume.values()))})", 
+                tuple(json_data.resume.values())
+            )
+            person_id = cursor.lastrowid
         
-            if person_id:
-                cursor.execute(
-                    f"UPDATE persons SET {','.join(json_data.resume['resume'].keys())} "
-                    f"WHERE id = {person_id}",
-                    tuple(json_data.resume['resume'].values())
-                )
-            else:
-                cursor.execute(
-                    f"INSERT INTO persons ({','.join(json_data.resume['resume'].keys())}) "
-                    f"VALUES ({','.join(['?'] * len(json_data.resume['resume'].values()))})", 
-                    tuple(json_data.resume['resume'].values())
-                )
-                person_id = cursor.lastrowid
-            
-            models = ['staffs', 'documents', 'addresses', 'contacts', 'workplaces', 'affilations']
-            items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
-                            json_data.contacts, json_data.workplaces, json_data.affilation]
-            
-            for model, items in zip(models, items_lists):
-                for item in items:
-                    if item:
-                        cursor.execute(
-                            f"INSERT INTO {model} ({','.join(item.keys())}, person_id) ",
-                            tuple(item.values()) + (person_id,)
-                        )
-            conn.commit()
+        models = ['staffs', 'documents', 'addresses', 'contacts', 'workplaces', 'affilations']
+        items_lists = [json_data.staff, json_data.passport, json_data.addresses, 
+                        json_data.contacts, json_data.workplaces, json_data.affilation]
+        
+        for model, items in zip(models, items_lists):
+            for item in items:
+                if item:
+                    cursor.execute(
+                        f"INSERT INTO {model} ({','.join(item.keys())}, person_id) "
+                        f"VALUES ({','.join(['?'] * len(item.values()))},?)",
+                        tuple(item.values()) + (person_id,)
+                    )
+        conn.commit()
 
 
 class JsonFile:
@@ -138,11 +139,10 @@ class JsonFile:
         with connection as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM regions WHERE region = ?",
+                "SELECT id FROM regions WHERE region = ?",
                 (name, )
             )
-            result = cursor.fetchone()
-            return result[0]
+            return cursor.fetchone()
 
     def parse_region(self):
         if 'department' in self.json_dict:
@@ -151,7 +151,7 @@ class JsonFile:
             for div in divisions:
                 region = self.get_region_id(div)
                 if region:
-                    region_id = region
+                    region_id = region[0]
             return region_id
 
     def parse_fullname(self):

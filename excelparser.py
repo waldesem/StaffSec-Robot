@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from datetime import date, datetime
 
@@ -6,70 +7,70 @@ from openpyxl import load_workbook
 from config import Config
 
 
-def excel_to_db(path_files):  # take path's to conclusions
-    for path in path_files:
-        excel = ExcelFile(path)
-        excel.person['resume'].update({
-            'category_id': 1,
-            'status_id': 9,
-            'region_id': 1
-            })
-        connection = sqlite3.connect(Config.DATABASE_URI)
-        with connection as conn:
-            cursor = conn.cursor()
+def excel_to_db(excel_path, excel_file):  # take path's to conclusions
+    excel = ExcelFile(excel_path, excel_file)
+    excel.person['resume'] | {'category_id': 1, 'status_id': 9, 'region_id': 1}
+    connection = sqlite3.connect(Config.DATABASE_URI)
+    with connection as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
+            (excel.person['resume']['fullname'], excel.person['resume']['birthday'])
+        )
+        result = cursor.fetchone()
+        person_id = result[0] if result else None
+
+        if not person_id:
             cursor.execute(
-                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-                (excel.person['resume']['fullname'], excel.person['resume']['birthday'])
+                f"INSERT INTO persons ({','.join(excel.person['resume'].keys())}) "
+                f"VALUES ({','.join(['?'] * len(excel.person['resume'].values()))})", 
+                tuple(excel.person['resume'].values())
             )
-            result = cursor.fetchone()
-            person_id = result[0] if result else None
+            person_id = cursor.lastrowid
+        else:
+            cursor.execute(
+                f"UPDATE persons SET {'=?,'.join(excel.person['resume'].keys())}=? "
+                f"WHERE id = {person_id}",
+                tuple(excel.person['resume'].values())
+            )
 
-            if not person_id:
-                cursor.execute(
-                    f"INSERT INTO persons ({','.join(excel.person['resume'].keys())}) "
-                    f"VALUES ({','.join(['?'] * len(excel.person['resume'].values()))})", 
-                    tuple(excel.person['resume'].values())
-                )
-                person_id = cursor.lastrowid
-            else:
-                cursor.execute(
-                    f"UPDATE persons SET {','.join(excel.person['resume'].keys())} "
-                    f"WHERE id = {person_id}",
-                    tuple(excel.person['resume'].values())
-                )
-
-            if excel.person['check']:
-                cursor.execute(
-                    f"INSERT INTO checks ({','.join(excel.person['check'].keys())}, person_id) ",
-                    tuple(excel.person['check'].values()) + (person_id,)
-                )
-            elif excel.person['robot']:
-                cursor.execute(
-                    f"INSERT INTO robots ({','.join(excel.person['robot'].keys())}, person_id) ",
-                    tuple(excel.person['robot'].values()) + (person_id,)
-                )
-            conn.commit()
+        if excel.person.get('check'):
+            cursor.execute(
+                f"INSERT INTO checks ({','.join(excel.person['check'].keys())}, person_id) "
+                f"VALUES ({','.join(['?'] * len(excel.person['check'].values()))}, ?)", 
+                tuple(excel.person['check'].values()) + (person_id,)
+            )
+        elif excel.person.get('robot'):
+            cursor.execute(
+                f"INSERT INTO robots ({','.join(excel.person['robot'].keys())}, person_id) "
+                f"VALUES ({','.join(['?'] * len(excel.person['robot'].values()))}, ?)", 
+                tuple(excel.person['robot'].values()) + (person_id,)
+            )
+        conn.commit()
 
 
 class ExcelFile:
     
-    def __init__(self, path):
-        self.person = []
-        self.screen_excel(path)
+    def __init__(self, excel_path, excel_file):
+        self.person = {}
+        self.excel_path = excel_path
+        self.excel_file = excel_file
+        self.screen_excel()
         
-    def screen_excel(self, path):
-        workbook = load_workbook(path, keep_vba=True)
+    def screen_excel(self):
+        workbook = load_workbook(os.path.join(self.excel_path, self.excel_file), keep_vba=True)
         worksheet = workbook.worksheets[0]
-        if path.startswith("Заключение"):
+        if self.excel_file.startswith("Заключение"):
             if len(workbook.sheetnames) > 1:
                 sheet = workbook.worksheets[1]
                 if str(sheet['K1'].value) == 'ФИО':
-                    self.person.append({'resume': self.get_resume(sheet)})
+                    self.person.update({'resume': self.get_resume(sheet)})
             else:
-                self.person.append({'resume': self.get_conclusion_resume(worksheet)})
-            self.person.append({'check': self.get_check(worksheet)})
+                self.person.update({'resume': self.get_conclusion_resume(worksheet)})
+            self.person.update({'check': self.get_check(worksheet)})
         else:
-            self.person.append({'robot': self.get_robot(worksheet)})
+            self.person.update({'resume': self.get_robot_resume(worksheet)})
+            self.person.update({'robot': self.get_robot(worksheet)})
 
         workbook.close()
 
@@ -118,9 +119,9 @@ class ExcelFile:
             'debt': sheet['C18'].value,
             'bankruptcy': sheet['C19'].value,
             'bki': sheet['C20'].value,
-            'affiliation': sheet['C21'].value,
+            'affilation': sheet['C21'].value,
             'internet': sheet['C22'].value,
-            'pfo': True if sheet['C2^'].value else False,
+            'pfo': True if sheet['C26'].value else False,
             'addition': sheet['C28'].value,
             'conclusion': ExcelFile.get_conclusion_id(sheet['C23'].value),
             'officer': sheet['C25'].value}
@@ -145,7 +146,7 @@ class ExcelFile:
         with connection as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM conclusions WHERE conclusion = ?",
+                "SELECT * FROM conclusions WHERE LOWER (conclusion) = ?",
                 (name, )
             )
             result = cursor.fetchone()
