@@ -21,3 +21,6 @@
 go.work
 
 StaffSec-Robot.code-workspace
+.venv
+venv
+__pycache__
