@@ -8,6 +8,7 @@ from config import Config
 
 def json_to_db(json_path, json_file):
     json_data = JsonFile(os.path.join(json_path, json_file))
+
     connection = sqlite3.connect(Config.DATABASE_URI)
     with connection as conn:
         cursor = conn.cursor()
@@ -20,9 +21,9 @@ def json_to_db(json_path, json_file):
     
         if person_id:
             cursor.execute(
-                f"UPDATE persons SET {'=?,'.join(json_data.resume['resume'].keys())},=? "
+                f"UPDATE persons SET {'=?,'.join(json_data.resume.keys())}=? "
                 f"WHERE id = {person_id}",
-                tuple(json_data.resume['resume'].values())
+                tuple(json_data.resume.values())
             )
         else:
             cursor.execute(
@@ -154,9 +155,9 @@ class JsonFile:
             return region_id
 
     def parse_fullname(self):
-        lastName = self.json_dict.get('lastName')
-        firstName = self.json_dict.get('firstName')
-        midName = self.json_dict.get('midName', '')
+        lastName = self.json_dict.get('lastName', 'None').strip()
+        firstName = self.json_dict.get('firstName', 'None').strip()
+        midName = self.json_dict.get('midName', '').strip()
         return f"{lastName} {firstName} {midName}".upper().rstrip()
     
     def parse_previous(self):

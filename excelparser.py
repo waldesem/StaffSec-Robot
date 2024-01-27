@@ -80,14 +80,14 @@ class ExcelFile:
     def get_resume(sheet):
         resume = {
             'fullname': ExcelFile.fullname_parser(str(sheet['K3'].value)),
-            'birthday': (sheet['L3'].value).date() \
-                if isinstance(sheet['L3'].value, datetime) \
-                    else date.today(),
+            'birthday': datetime.strptime(sheet['L3'].value, '%d.%m.%Y').date() \
+                if sheet['L3'].value else date.today(),
             'birthplace': str(sheet['M3'].value).strip(),
             'country': str(sheet['T3'].value).strip(),
             'snils': str(sheet['U3'].value).strip(),
             'inn': str(sheet['V3'].value).strip()
             }
+        print("get_resume: ", resume)
         return resume
 
     @staticmethod
@@ -98,14 +98,15 @@ class ExcelFile:
                 if isinstance(sheet['L3'].value, datetime) \
                     else date.today()
                     }
+        print("get_conclusion_resume: ", resumes)
         return resumes
     
     @staticmethod
     def get_robot_resume(sheet):
         resumes = {'fullname': ExcelFile.fullname_parser(sheet['B4'].value),
-                    'birthday': (sheet['L3'].value).date() \
-                            if isinstance(sheet['L3'].value, datetime) \
-                                else date.today()}
+                    'birthday': datetime.strptime(sheet['B5'].value, '%d.%m.%Y').date() \
+                        if sheet['B5'].value else date.today()}
+        print("get_robot_resume: ", resumes)
         return resumes
 
     

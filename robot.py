@@ -21,9 +21,9 @@ def main():
     if date.today() == main_file_date:
         shutil.copy(Config.MAIN_FILE, Config.ARCHIVE_DIR_2)
         parse_main()
-    # if date.today() == info_file_date:
-    #     shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR_2)
-    #     parse_info()        
+    if date.today() == info_file_date:
+        shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR_2)
+        parse_info()        
 
     print(f'Script execution time: {datetime.now() - now}')
 
@@ -115,7 +115,7 @@ def screen_registry_data(sheet, num):
                 else date.today()
     decision = sheet[f'J{num}'].value
     url = sheet[f'L{num}'].value
-
+    
     connection = sqlite3.connect(Config.DATABASE_URI)
     with connection as conn:
         cursor = conn.cursor()
