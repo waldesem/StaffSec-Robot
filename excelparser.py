@@ -59,7 +59,7 @@ class ExcelFile:
         self.screen_excel()
         
     def screen_excel(self):
-        workbook = load_workbook(os.path.join(self.excel_path, self.excel_file), keep_vba=True, read_only=True)
+        workbook = load_workbook(os.path.join(self.excel_path, self.excel_file), keep_vba=True)
         worksheet = workbook.worksheets[0]
 
         if self.excel_file.startswith("Заключение"):

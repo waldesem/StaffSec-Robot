@@ -2,6 +2,8 @@ import os
 import shutil
 from datetime import datetime, date
 import sqlite3
+import logging
+import asyncio
 
 from openpyxl import load_workbook
 
@@ -10,66 +12,105 @@ from excelparser import ExcelFile, excel_to_db
 from jsonparser import json_to_db
 
 
-def main():
+logging.basicConfig(filename=Config.LOG_FILE, 
+                    format='%(asctime)s - %(message)s', 
+                    level=logging.INFO)
+
+
+async def main():
     now = datetime.now()
 
     main_file_date = date.fromtimestamp(os.path.getmtime(Config.MAIN_FILE))
     info_file_date = date.fromtimestamp(os.path.getmtime(Config.INFO_FILE))
 
+    tasks = [
+        archive_db(main_file_date, info_file_date),
+        archive_main(main_file_date),
+        archive_info(info_file_date),
+    ]
+    await asyncio.gather(*tasks)
+
+    logging.info(f'Script execution time: {datetime.now() - now}')
+
+
+async def archive_db(main_file_date, info_file_date):
     if date.today() in [main_file_date, info_file_date]:
-        shutil.copy(os.path.join(Config.BASE_PATH, 'persons.db'), Config.ARCHIVE_DIR_2)
+        shutil.copy(os.path.join(Config.BASE_PATH, 'persons.db'), Config.ARCHIVE_DIR)
+        logging.info(f'persons.db copied to {Config.ARCHIVE_DIR}')
+    else:
+        logging.info(f'persons.db not changed')
+
+
+async def archive_main(main_file_date):
     if date.today() == main_file_date:
-        shutil.copy(Config.MAIN_FILE, Config.ARCHIVE_DIR_2)
-        parse_main()
+        shutil.copy(Config.MAIN_FILE, Config.ARCHIVE_DIR)
+        logging.info(f'Main file copied to {Config.ARCHIVE_DIR}')
+        await parse_main()
+    else:
+        logging.info(f'Main file not changed')
+
+
+async def archive_info(info_file_date):
     if date.today() == info_file_date:
-        shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR_2)
-        parse_info()        
+        shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR)
+        logging.info(f'Info file copied to {Config.ARCHIVE_DIR}')
+        await parse_inquiry()        
+    else:
+        logging.info(f'Info file not changed')
 
-    print(f'Script execution time: {datetime.now() - now}')
+    
+async def process_cell(ws, subdir, i):
+    fio = ExcelFile.fullname_parser(ws['B' + str(i)].value)
+    subdir_path = os.path.join(Config.WORK_DIR, subdir)
+    
+    for file in os.listdir(subdir_path):
+        if (file.startswith("Заключение") or file.startswith("Результаты")) \
+            and (file.endswith("xlsm") or file.endswith("xlsx")):
+            excel_to_db(subdir_path, file)
+        elif file.endswith("json"):
+            json_to_db(subdir_path, file)
+
+    lnk = os.path.join(Config.ARCHIVE_DIR, subdir[0], f"{subdir} - {ws['A' + str(i)].value}")
+    ws['L' + str(i)].hyperlink = str(lnk)
+    try:
+        shutil.move(subdir_path, lnk)
+        logging.info(f'{subdir_path} moved to {lnk}')
+    except Exception as e:
+        logging.error(e)
+
+    screen_registry_data(ws, i)
 
 
-def parse_main():
+async def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True)
     ws = wb.worksheets[0]
 
     subdirs = os.listdir(Config.WORK_DIR)
+    tasks = []
     for i, cell in enumerate(ws['K10000':'K50000'], 10000):
         for c in cell:
-            if c.value:
-                if isinstance(c.value, datetime) and (c.value).date() == date.today():
-                    fio = ExcelFile.fullname_parser(ws['B' + str(i)].value)
-                    subdir = [sub for sub in subdirs if ExcelFile.fullname_parser(sub) == fio]
-                    if subdir:
-                        subdir_path = os.path.join(Config.WORK_DIR, subdir[0])
-
-                        for file in os.listdir(subdir_path):
-                            if (file.startswith("Заключение") or file.startswith("Результаты")) \
-                                and (file.endswith("xlsm") or file.endswith("xlsx")):
-                                excel_to_db(subdir_path, file)
-                            elif file.endswith("json"):
-                                json_to_db(subdir_path, file)
-
-                        lnk = os.path.join(Config.ARCHIVE_DIR_2, 
-                                           subdir[0][0], 
-                                           f"{subdir[0]} - {ws['A' + str(i)].value}")
-                        ws['L' + str(i)].hyperlink = str(lnk)
-                        shutil.move(subdir_path, lnk)
-                        
-                        screen_registry_data(ws, i)
+            if c.value and isinstance(c.value, datetime) and (c.value).date() == date.today():
+                fio = ExcelFile.fullname_parser(ws['B' + str(i)].value)
+                subdir = [sub for sub in subdirs if ExcelFile.fullname_parser(sub) == fio]
+                if subdir:
+                    tasks.append(process_cell(ws, subdir[0], i))
+    await asyncio.gather(*tasks)
 
     wb.save(Config.MAIN_FILE)
     wb.close()
+    logging.info('Main file parsed')
 
-def parse_info():
+async def parse_inquiry():
     wb = load_workbook(Config.INFO_FILE, keep_vba=True, read_only=True)
     ws = wb.worksheets[0]
     for i, cell in enumerate(ws['G500':'G5000'], 500):
         for c in cell:
-            if c.value:
-                if isinstance(c.value, datetime) and (c.value).date() == date.today():
-                    screen_iquiry_data(ws, i)
+            if c.value and isinstance(c.value, datetime) and (c.value).date() == date.today():
+                screen_iquiry_data(ws, i)
     wb.close()
-        
+    logging.info('Info file parsed')
+
+
 def screen_iquiry_data(sheet, num): 
     info = sheet[f'E{num}'].value
     initiator = sheet[f'F{num}'].value
@@ -147,4 +188,4 @@ def screen_registry_data(sheet, num):
         
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
