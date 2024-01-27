@@ -87,7 +87,6 @@ class ExcelFile:
             'snils': str(sheet['U3'].value).strip(),
             'inn': str(sheet['V3'].value).strip()
             }
-        print("get_resume: ", resume)
         return resume
 
     @staticmethod
@@ -98,7 +97,6 @@ class ExcelFile:
                 if isinstance(sheet['L3'].value, datetime) \
                     else date.today()
                     }
-        print("get_conclusion_resume: ", resumes)
         return resumes
     
     @staticmethod
@@ -106,7 +104,6 @@ class ExcelFile:
         resumes = {'fullname': ExcelFile.fullname_parser(sheet['B4'].value),
                     'birthday': datetime.strptime(sheet['B5'].value, '%d.%m.%Y').date() \
                         if sheet['B5'].value else date.today()}
-        print("get_robot_resume: ", resumes)
         return resumes
 
     
