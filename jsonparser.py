@@ -1,7 +1,7 @@
 import os
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 from config import Config
 
@@ -60,8 +60,7 @@ class JsonFile:
                 'status_id': self.get_status_id("Окончено"),
                 'fullname': self.parse_fullname(),
                 'previous': self.parse_previous(),
-                'birthday': datetime.strptime(self.json_dict.get('birthday', '1900-01-01'), 
-                                              '%Y-%m-%d'),
+                'birthday': self.json_dict.get('birthday', date.today()),
                 'birthplace': self.json_dict.get('birthplace', ''),
                 'country': self.json_dict.get('citizen' ''),
                 'ext_country': self.json_dict.get('additionalCitizenship', ''),
@@ -158,7 +157,7 @@ class JsonFile:
         lastName = self.json_dict.get('lastName')
         firstName = self.json_dict.get('firstName')
         midName = self.json_dict.get('midName', '')
-        return f"{lastName} {firstName} {midName}".rstrip()
+        return f"{lastName} {firstName} {midName}".upper().rstrip()
     
     def parse_previous(self):
         if 'hasNameChanged' in self.json_dict:

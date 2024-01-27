@@ -7,9 +7,10 @@ from openpyxl import load_workbook
 from config import Config
 
 
-def excel_to_db(excel_path, excel_file):  # take path's to conclusions
+def excel_to_db(excel_path, excel_file):
     excel = ExcelFile(excel_path, excel_file)
     excel.person['resume'] | {'category_id': 1, 'status_id': 9, 'region_id': 1}
+    
     connection = sqlite3.connect(Config.DATABASE_URI)
     with connection as conn:
         cursor = conn.cursor()
@@ -58,8 +59,9 @@ class ExcelFile:
         self.screen_excel()
         
     def screen_excel(self):
-        workbook = load_workbook(os.path.join(self.excel_path, self.excel_file), keep_vba=True)
+        workbook = load_workbook(os.path.join(self.excel_path, self.excel_file), keep_vba=True, read_only=True)
         worksheet = workbook.worksheets[0]
+
         if self.excel_file.startswith("Заключение"):
             if len(workbook.sheetnames) > 1:
                 sheet = workbook.worksheets[1]
@@ -77,7 +79,7 @@ class ExcelFile:
     @staticmethod
     def get_resume(sheet):
         resume = {
-            'fullname': str(sheet['K3'].value).title().strip(),
+            'fullname': ExcelFile.fullname_parser(str(sheet['K3'].value)),
             'birthday': (sheet['L3'].value).date() \
                 if isinstance(sheet['L3'].value, datetime) \
                     else date.today(),
@@ -91,7 +93,7 @@ class ExcelFile:
     @staticmethod
     def get_conclusion_resume(sheet):
         resumes = {
-            'fullname': sheet['C6'].value,
+            'fullname': ExcelFile.fullname_parser(sheet['C6'].value),
             'birthday': (sheet['C8'].value).date() \
                 if isinstance(sheet['L3'].value, datetime) \
                     else date.today()
@@ -100,7 +102,7 @@ class ExcelFile:
     
     @staticmethod
     def get_robot_resume(sheet):
-        resumes = {'fullname': sheet['B4'].value,
+        resumes = {'fullname': ExcelFile.fullname_parser(sheet['B4'].value),
                     'birthday': (sheet['L3'].value).date() \
                             if isinstance(sheet['L3'].value, datetime) \
                                 else date.today()}
@@ -147,7 +149,11 @@ class ExcelFile:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT * FROM conclusions WHERE LOWER (conclusion) = ?",
-                (name, )
+                (name.lower(), )
             )
             result = cursor.fetchone()
-        return result
+            return result[0] if result else 1
+
+    @staticmethod
+    def fullname_parser(fullname: str) -> str:
+        return ' '.join(filter(None, map(str.strip, fullname.split()))).upper()
