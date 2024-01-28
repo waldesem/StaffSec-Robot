@@ -1,14 +1,14 @@
 import os
 import shutil
 from datetime import datetime, date
-import sqlite3
 import logging
 import asyncio
 
+import aiosqlite
 from openpyxl import load_workbook
 
 from config import Config
-from excelparser import ExcelFile, excel_to_db
+from excelparser import excel_to_db, fullname_parser, get_conclusion_id
 from jsonparser import json_to_db
 
 
@@ -60,15 +60,15 @@ async def archive_info(info_file_date):
 
     
 async def process_cell(ws, subdir, i):
-    fio = ExcelFile.fullname_parser(ws['B' + str(i)].value)
+    fio = fullname_parser(ws['B' + str(i)].value)
     subdir_path = os.path.join(Config.WORK_DIR, subdir)
     
     for file in os.listdir(subdir_path):
         if (file.startswith("Заключение") or file.startswith("Результаты")) \
             and (file.endswith("xlsm") or file.endswith("xlsx")):
-            excel_to_db(subdir_path, file)
+            await excel_to_db(subdir_path, file)
         elif file.endswith("json"):
-            json_to_db(subdir_path, file)
+            await json_to_db(subdir_path, file)
 
     lnk = os.path.join(Config.ARCHIVE_DIR, subdir[0], f"{subdir} - {ws['A' + str(i)].value}")
     ws['L' + str(i)].hyperlink = str(lnk)
@@ -78,7 +78,7 @@ async def process_cell(ws, subdir, i):
     except Exception as e:
         logging.error(e)
 
-    screen_registry_data(ws, i)
+    await screen_registry_data(ws, i)
 
 
 async def parse_main():
@@ -90,8 +90,8 @@ async def parse_main():
     for i, cell in enumerate(ws['K10000':'K50000'], 10000):
         for c in cell:
             if c.value and isinstance(c.value, datetime) and (c.value).date() == date.today():
-                fio = ExcelFile.fullname_parser(ws['B' + str(i)].value)
-                subdir = [sub for sub in subdirs if ExcelFile.fullname_parser(sub) == fio]
+                fio = fullname_parser(ws['B' + str(i)].value)
+                subdir = [sub for sub in subdirs if fullname_parser(sub) == fio]
                 if subdir:
                     tasks.append(process_cell(ws, subdir[0], i))
     await asyncio.gather(*tasks)
@@ -106,85 +106,82 @@ async def parse_inquiry():
     for i, cell in enumerate(ws['G500':'G5000'], 500):
         for c in cell:
             if c.value and isinstance(c.value, datetime) and (c.value).date() == date.today():
-                screen_iquiry_data(ws, i)
+                await screen_iquiry_data(ws, i)
     wb.close()
     logging.info('Info file parsed')
 
 
-def screen_iquiry_data(sheet, num): 
+async def screen_iquiry_data(sheet, num): 
     info = sheet[f'E{num}'].value
     initiator = sheet[f'F{num}'].value
-    fullname = ExcelFile.fullname_parser(sheet[f'A{num}'].value)
+    fullname = fullname_parser(sheet[f'A{num}'].value)
     birthday = (sheet[f'B{num}'].value).date() \
         if isinstance(sheet[f'B{num}'].value, datetime) \
             else date.today()
     
-    connection = sqlite3.connect(Config.DATABASE_URI)
-    with connection as conn:
-        cursor = conn.cursor()
+    async with aiosqlite.connect(Config.DATABASE_URI) as db:
 
-        person = cursor.execute(
+        async with db.execute(
             "SELECT * FROM persons WHERE fullname = ? AND birthday = ?", 
             (fullname, birthday)
-        )
-        result = person.fetchone()
+        ) as cursor:
+            result = await cursor.fetchone()
 
-        if not result:
-            cursor.execute(
-                "INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) \
-                            VALUES (?, ?, ?, ?, ?, ?)", 
-                (fullname, birthday, datetime.now(), 1, 1, 9)
-            )
-            result = [cursor.lastrowid]
-        else:
-            cursor.execute(
-                "UPDATE persons SET updated = ? WHERE id = ?", 
-                (datetime.now(), result[0])
+            if not result:
+                await db.execute(
+                    "INSERT INTO persons (fullname, birthday, created, category_id, region_id, status_id) \
+                                VALUES (?, ?, ?, ?, ?, ?)", 
+                    (fullname, birthday, datetime.now(), 1, 1, 9)
                 )
-        cursor.execute(
-            "INSERT INTO inquiries (info, initiator, deadline, person_id) \
-                        VALUES (?, ?, ?, ?)", 
-            (info, initiator, datetime.now(), result[0])
-            )
-        conn.commit()
+                result = [cursor.lastrowid]
+            else:
+                await db.execute(
+                    "UPDATE persons SET updated = ? WHERE id = ?", 
+                    (datetime.now(), result[0])
+                    )
+            await db.execute(
+                "INSERT INTO inquiries (info, initiator, deadline, person_id) \
+                            VALUES (?, ?, ?, ?)", 
+                (info, initiator, datetime.now(), result[0])
+                )
+            
+            await db.commit()
 
 
-def screen_registry_data(sheet, num):
-    fullname = ExcelFile.fullname_parser(sheet['B' + str(num)].value)
+async def screen_registry_data(sheet, num):
+    fullname = fullname_parser(sheet['B' + str(num)].value)
     birthday = (sheet['C' + str(num)].value).date() \
             if isinstance(sheet['C' + str(num)].value, datetime) \
                 else date.today()
     decision = sheet[f'J{num}'].value
     url = sheet[f'L{num}'].value
     
-    connection = sqlite3.connect(Config.DATABASE_URI)
-    with connection as conn:
-        cursor = conn.cursor()
-        person = cursor.execute(
+    async with aiosqlite.connect(Config.DATABASE_URI) as db:
+        async with db.execute(
             "SELECT * FROM persons WHERE fullname = ? AND birthday = ?", 
             (fullname, birthday)
-        )
-        result = person.fetchone()
-        if not result:
-            cursor.execute(
-                "INSERT INTO persons (fullname, birthday, path, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                (fullname, birthday, url, datetime.now(), 1, 1, 9)
+        ) as cursor:
+            result = await cursor.fetchone()
+            if not result:
+                await db.execute(
+                    "INSERT INTO persons (fullname, birthday, path, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                    (fullname, birthday, url, datetime.now(), 1, 1, 9)
+                    )
+                await db.execute(
+                    "INSERT INTO checks (conclusion, deadline, person_id) VALUES (?, ?, ?)",
+                    (await get_conclusion_id(decision), datetime.now(), await db.lastrowid)
                 )
-
-            cursor.execute(
-                f"INSERT INTO checks (conclusion, deadline, person_id) VALUES (?, ?, ?)",
-                (ExcelFile.get_conclusion_id(decision), datetime.now(), cursor.lastrowid)
-                )
-        else:
-            cursor.execute(
-                "UPDATE persons SET path = ?, updated = ? WHERE id = ?", 
-                (url, datetime.now(), result[0])
-                )
-            cursor.execute(
-                f"UPDATE checks SET conclusion = ?, deadline = ? WHERE person_id = ?", 
-                (ExcelFile.get_conclusion_id(decision), datetime.now(), cursor.lastrowid)
-                )
-        conn.commit()
+            else:
+                await db.execute(
+                    "UPDATE persons SET path = ?, updated = ? WHERE id = ?", 
+                    (url, datetime.now(), result[0])
+                    )
+                await db.execute(
+                    "UPDATE checks SET conclusion = ?, deadline = ? WHERE person_id = ?",
+                    (await get_conclusion_id(decision), datetime.now(), result[0])
+                    )
+                
+            await db.commit()
         
 
 if __name__ == "__main__":
