@@ -13,5 +13,5 @@ python robot.py
 
 ```bash
 pip install -r requirements.txt
-pyinstaller --onefile --clean robot.py
+pyinstaller --clean robot.py
 ```
