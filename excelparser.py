@@ -58,10 +58,17 @@ async def screen_excel(excel_path, excel_file):
     if excel_file.startswith("Заключение"):
         if len(workbook.sheetnames) > 1:
             sheet = workbook.worksheets[1]
-            if str(sheet["K1"].value) == "ФИО":
+            if (
+                str(sheet["K1"].value) == "ФИО"
+                and sheet["K2"].value
+                and sheet["L3"].value
+            ):
                 person.update({"resume": await get_resume(sheet)})
-        person.update({"resume": await get_conclusion_resume(worksheet)})
-        person.update({"check": await get_check(worksheet)})
+        else:
+            if sheet["C6"].value and sheet["C8"].value:
+                person.update({"resume": await get_conclusion_resume(worksheet)})
+        if sheet["C23"].value:
+            person.update({"check": await get_check(worksheet)})
     else:
         person.update({"resume": await get_robot_resume(worksheet)})
         person.update({"robot": await get_robot(worksheet)})
