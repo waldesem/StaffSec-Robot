@@ -9,44 +9,45 @@ from config import Config
 
 async def excel_to_db(excel_path, excel_file):
     excel = await screen_excel(excel_path, excel_file)
-    excel["resume"] | {"category_id": 1, "status_id": 9, "region_id": 1}
+    if excel.get("resume"):
+        excel["resume"] | {"category_id": 1, "status_id": 9, "region_id": 1}
 
-    async with aiosqlite.connect(Config.DATABASE_URI) as db:
-        async with db.execute(
-            "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-            (excel["resume"]["fullname"], excel["resume"]["birthday"]),
-        ) as cursor:
-            result = await cursor.fetchone()
-            person_id = result[0] if result else None
+        async with aiosqlite.connect(Config.DATABASE_URI) as db:
+            async with db.execute(
+                "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
+                (excel["resume"]["fullname"], excel["resume"]["birthday"]),
+            ) as cursor:
+                result = await cursor.fetchone()
+                person_id = result[0] if result else None
 
-        if not person_id:
-            await db.execute(
-                f"INSERT INTO persons ({','.join(excel['resume'].keys())}) "
-                f"VALUES ({','.join(['?'] * len(excel['resume'].values()))})",
-                tuple(excel["resume"].values()),
-            )
-            person_id = cursor.lastrowid
-        else:
-            await db.execute(
-                f"UPDATE persons SET {'=?,'.join(excel['resume'].keys())}=? "
-                f"WHERE id = {person_id}",
-                tuple(excel["resume"].values()),
-            )
+            if not person_id:
+                await db.execute(
+                    f"INSERT INTO persons ({','.join(excel['resume'].keys())}), created "
+                    f"VALUES ({','.join(['?'] * len(excel['resume'].values()))}), ?",
+                    tuple(excel["resume"].values()) + (datetime.now(),),
+                )
+                person_id = cursor.lastrowid
+            else:
+                await db.execute(
+                    f"UPDATE persons SET {'=?,'.join(excel['resume'].keys())}=?, updated=? "
+                    f"WHERE id = {person_id}",
+                    tuple(excel["resume"].values()) + (datetime.now(),),
+                )
 
-        if excel.get("check"):
-            await db.execute(
-                f"INSERT INTO checks ({','.join(excel['check'].keys())}, person_id) "
-                f"VALUES ({','.join(['?'] * len(excel['check'].values()))}, ?)",
-                tuple(excel["check"].values()) + (person_id,),
-            )
-        elif excel.get("robot"):
-            await db.execute(
-                f"INSERT INTO robots ({','.join(excel['robot'].keys())}, person_id) "
-                f"VALUES ({','.join(['?'] * len(excel['robot'].values()))}, ?)",
-                tuple(excel["robot"].values()) + (person_id,),
-            )
+            if excel.get("check"):
+                await db.execute(
+                    f"INSERT INTO checks ({','.join(excel['check'].keys())}, person_id) "
+                    f"VALUES ({','.join(['?'] * len(excel['check'].values()))}, ?)",
+                    tuple(excel["check"].values()) + (person_id,),
+                )
+            elif excel.get("robot"):
+                await db.execute(
+                    f"INSERT INTO robots ({','.join(excel['robot'].keys())}, person_id) "
+                    f"VALUES ({','.join(['?'] * len(excel['robot'].values()))}, ?)",
+                    tuple(excel["robot"].values()) + (person_id,),
+                )
 
-        await db.commit()
+            await db.commit()
 
 
 async def screen_excel(excel_path, excel_file):
@@ -59,8 +60,7 @@ async def screen_excel(excel_path, excel_file):
             sheet = workbook.worksheets[1]
             if str(sheet["K1"].value) == "ФИО":
                 person.update({"resume": await get_resume(sheet)})
-        else:
-            person.update({"resume": await get_conclusion_resume(worksheet)})
+        person.update({"resume": await get_conclusion_resume(worksheet)})
         person.update({"check": await get_check(worksheet)})
     else:
         person.update({"resume": await get_robot_resume(worksheet)})
@@ -120,6 +120,7 @@ async def get_check(sheet):
         "pfo": True if sheet["C26"].value else False,
         "addition": sheet["C28"].value,
         "conclusion": await get_conclusion_id(sheet["C23"].value),
+        "deadline": datetime.now(),
         "officer": sheet["C25"].value,
     }
     return checks
@@ -134,6 +135,7 @@ async def get_robot(sheet):
         "mvd": sheet["B23"].value,
         "courts": sheet["B24"].value,
         "bki": sheet["B25"].value,
+        "deadline": datetime.now(),
     }
     return robot
 
