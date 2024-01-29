@@ -22,7 +22,7 @@ async def excel_to_db(excel_path, excel_file):
 
             if not person_id:
                 await db.execute(
-                    f"INSERT INTO persons ({','.join(excel['resume'].keys())}), created "
+                    f"INSERT INTO persons ({','.join(excel['resume'].keys())}, created) "
                     f"VALUES ({','.join(['?'] * len(excel['resume'].values()))}), ?",
                     tuple(excel["resume"].values()) + (datetime.now(),),
                 )
@@ -58,17 +58,20 @@ async def screen_excel(excel_path, excel_file):
     if excel_file.startswith("Заключение"):
         if len(workbook.sheetnames) > 1:
             sheet = workbook.worksheets[1]
+            
             if (
                 str(sheet["K1"].value) == "ФИО"
-                and sheet["K2"].value
+                and sheet["K3"].value
                 and sheet["L3"].value
             ):
                 person.update({"resume": await get_resume(sheet)})
-        else:
-            if sheet["C6"].value and sheet["C8"].value:
-                person.update({"resume": await get_conclusion_resume(worksheet)})
+
+        if sheet["C6"].value and sheet["C8"].value:
+            person.update({"resume": await get_conclusion_resume(worksheet)})
+
         if sheet["C23"].value:
             person.update({"check": await get_check(worksheet)})
+
     else:
         person.update({"resume": await get_robot_resume(worksheet)})
         person.update({"robot": await get_robot(worksheet)})
@@ -124,7 +127,9 @@ async def get_check(sheet):
         "bki": sheet["C20"].value,
         "affilation": sheet["C21"].value,
         "internet": sheet["C22"].value,
-        "pfo": True if sheet["C26"].value else False,
+        "pfo": False
+        if sheet["C26"].value or str(sheet["C26"].value).lower() == "не назначалось"
+        else True,
         "addition": sheet["C28"].value,
         "conclusion": await get_conclusion_id(sheet["C23"].value),
         "deadline": datetime.now(),

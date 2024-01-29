@@ -20,15 +20,15 @@ async def json_to_db(json_path, json_file):
 
             if person_id:
                 await db.execute(
-                    f"UPDATE persons SET {'=?,'.join(json_data['resume'].keys())}=? "
+                    f"UPDATE persons SET {'=?,'.join(json_data['resume'].keys())}=?, updated=? "
                     f"WHERE id = {person_id}",
-                    tuple(json_data["resume"].values()),
+                    tuple(json_data["resume"].values()) + (datetime.now(),),
                 )
             else:
                 await db.execute(
-                    f"INSERT INTO persons ({','.join(json_data['resume'].keys())}) "
-                    f"VALUES ({','.join(['?'] * len(json_data['resume'].values()))})",
-                    tuple(json_data["resume"].values()),
+                    f"INSERT INTO persons ({','.join(json_data['resume'].keys())}, created) "
+                    f"VALUES ({','.join(['?'] * len(json_data['resume'].values()))}, ?)",
+                    tuple(json_data["resume"].values()) + (datetime.now(),),
                 )
                 person_id = cursor.lastrowid
 
