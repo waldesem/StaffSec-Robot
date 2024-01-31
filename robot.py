@@ -71,32 +71,34 @@ async def parse_main():
                 and isinstance(c.value, datetime)
                 and (c.value).date() == date.today()
             ):
-                fio = fullname_parser(ws["B" + str(i)].value)
                 for sub in subdirs:
-                    if fullname_parser(sub) == fio:
+                    if fullname_parser(sub) == fullname_parser(ws["B" + str(i)].value):
                         subdir_path = os.path.join(Config.WORK_DIR, sub)
 
                         for file in os.listdir(subdir_path):
-                            if (file.startswith("Заключение") or file.startswith("Результаты")) and (
-                                file.endswith("xlsm") or file.endswith("xlsx")
-                            ):
+                            if (
+                                file.startswith("Заключение")
+                                or file.startswith("Результаты")
+                            ) and (file.endswith("xlsm") or file.endswith("xlsx")):
                                 await excel_to_db(subdir_path, file)
                             elif file.endswith("json"):
                                 await json_to_db(subdir_path, file)
 
                         lnk = os.path.join(
-                            Config.ARCHIVE_DIR, sub[0], f"{sub} - {ws['A' + str(i)].value}"
+                            Config.ARCHIVE_DIR,
+                            sub[0],
+                            f"{sub} - {ws['A' + str(i)].value}",
                         )
                         ws["L" + str(i)].hyperlink = str(lnk)
                         try:
                             shutil.move(subdir_path, lnk)
-                            logging.info(f"{subdir_path} moved to {lnk}")
+                            logging.info(f"{sub} moved to {Config.ARCHIVE_DIR}")
                         except Exception as e:
                             logging.error(e)
-                        
+
                         break
-                
-                await (screen_registry_data(ws, i))
+
+                await screen_registry_data(ws, i)
 
     wb.save(Config.MAIN_FILE)
     wb.close()
