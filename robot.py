@@ -59,36 +59,11 @@ async def archive_info(info_file_date):
         logging.info(f"Info file not changed")
 
 
-async def process_cell(ws, subdir, i):
-    subdir_path = os.path.join(Config.WORK_DIR, subdir)
-
-    for file in os.listdir(subdir_path):
-        if (file.startswith("Заключение") or file.startswith("Результаты")) and (
-            file.endswith("xlsm") or file.endswith("xlsx")
-        ):
-            await excel_to_db(subdir_path, file)
-        elif file.endswith("json"):
-            await json_to_db(subdir_path, file)
-
-    lnk = os.path.join(
-        Config.ARCHIVE_DIR, subdir[0], f"{subdir} - {ws['A' + str(i)].value}"
-    )
-    ws["L" + str(i)].hyperlink = str(lnk)
-    try:
-        shutil.move(subdir_path, lnk)
-        logging.info(f"{subdir_path} moved to {lnk}")
-    except Exception as e:
-        logging.error(e)
-
-    await screen_registry_data(ws, i)
-
-
 async def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True)
     ws = wb.worksheets[0]
 
     subdirs = os.listdir(Config.WORK_DIR)
-    tasks = []
     for i, cell in enumerate(ws["K10000":"K50000"], 10000):
         for c in cell:
             if (
@@ -99,11 +74,28 @@ async def parse_main():
                 fio = fullname_parser(ws["B" + str(i)].value)
                 subdir = [sub for sub in subdirs if fullname_parser(sub) == fio]
                 if subdir:
-                    tasks.append(process_cell(ws, subdir[0], i))
-                else:
-                    tasks.append(screen_registry_data(ws, i))
+                    subdir_path = os.path.join(Config.WORK_DIR, subdir)
 
-    await asyncio.gather(*tasks)
+                    for file in os.listdir(subdir_path):
+                        if (file.startswith("Заключение") or file.startswith("Результаты")) and (
+                            file.endswith("xlsm") or file.endswith("xlsx")
+                        ):
+                            await excel_to_db(subdir_path, file)
+                        elif file.endswith("json"):
+                            await json_to_db(subdir_path, file)
+
+                    lnk = os.path.join(
+                        Config.ARCHIVE_DIR, subdir[0], f"{subdir} - {ws['A' + str(i)].value}"
+                    )
+                    ws["L" + str(i)].hyperlink = str(lnk)
+                    try:
+                        shutil.move(subdir_path, lnk)
+                        logging.info(f"{subdir_path} moved to {lnk}")
+                    except Exception as e:
+                        logging.error(e)
+                
+                await (screen_registry_data(ws, i))
+
 
     wb.save(Config.MAIN_FILE)
     wb.close()
