@@ -26,8 +26,8 @@ async def json_to_db(json_path, json_file):
                 )
             else:
                 await db.execute(
-                    f"INSERT INTO persons ({','.join(json_data['resume'].keys())}, created) "
-                    f"VALUES ({','.join(['?'] * len(json_data['resume'].values()))}, ?)",
+                    f"INSERT INTO persons ({','.join(json_data['resume'].keys())},created) "
+                    f"VALUES ({','.join(['?'] * len(json_data['resume'].values()))},?)",
                     tuple(json_data["resume"].values()) + (datetime.now(),),
                 )
                 person_id = cursor.lastrowid

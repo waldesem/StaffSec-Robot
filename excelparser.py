@@ -22,8 +22,8 @@ async def excel_to_db(excel_path, excel_file):
 
             if not person_id:
                 await db.execute(
-                    f"INSERT INTO persons ({','.join(excel['resume'].keys())}, created) "
-                    f"VALUES ({','.join(['?'] * len(excel['resume'].values()))}), ?",
+                    f"INSERT INTO persons ({','.join(excel['resume'].keys())},created) "
+                    f"VALUES ({','.join(['?'] * len(excel['resume'].values()))},?)",
                     tuple(excel["resume"].values()) + (datetime.now(),),
                 )
                 person_id = cursor.lastrowid
@@ -36,8 +36,8 @@ async def excel_to_db(excel_path, excel_file):
 
             if excel.get("check"):
                 await db.execute(
-                    f"INSERT INTO checks ({','.join(excel['check'].keys())}, person_id) "
-                    f"VALUES ({','.join(['?'] * len(excel['check'].values()))}, ?)",
+                    f"INSERT INTO checks ({','.join(excel['check'].keys())},person_id) "
+                    f"VALUES ({','.join(['?'] * len(excel['check'].values()))},?)",
                     tuple(excel["check"].values()) + (person_id,),
                 )
             elif excel.get("robot"):
