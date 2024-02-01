@@ -4,7 +4,7 @@ from datetime import date, datetime
 from openpyxl import load_workbook
 
 from database.dbase import excel_to_db
-from action.actions import name_convert, get_conclusion_id
+from action.actions import name_convert, get_item_id
 
 
 async def screen_excel(excel_path, excel_file):
@@ -89,7 +89,7 @@ async def get_check(sheet):
         if sheet["C26"].value or str(sheet["C26"].value).lower() == "не назначалось"
         else True,
         "addition": sheet["C28"].value,
-        "conclusion": await get_conclusion_id(sheet["C23"].value),
+        "conclusion": await get_item_id("conclusions", "conclusion", sheet["C23"].value),
         "deadline": datetime.now(),
         "officer": sheet["C25"].value,
     }

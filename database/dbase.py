@@ -3,12 +3,7 @@ from datetime import datetime
 import aiosqlite
 
 from enums.classes import Categories, Regions, Statuses
-from action.actions import (
-    get_conclusion_id,
-    get_region_id,
-    get_category_id,
-    get_status_id,
-)
+from action.actions import get_item_id
 
 from config import Config
 
@@ -29,9 +24,9 @@ async def db_main_data(fullname, birthday, decision, url):
                         birthday,
                         url,
                         datetime.now(),
-                        await get_category_id(Categories.candidate.value),
-                        await get_region_id(Regions.MAIN_OFFICE.value),
-                        await get_status_id(Statuses.finish.value),
+                        await get_item_id("categories", "category", Categories.candidate.value),
+                        await get_item_id("regions", "region", Regions.MAIN_OFFICE.value),
+                        await get_item_id("statuses", "status", Statuses.finish.value),
                     ),
                 )
 
@@ -44,7 +39,7 @@ async def db_main_data(fullname, birthday, decision, url):
             await db.execute(
                 "INSERT INTO checks (conclusion, deadline, person_id) VALUES (?, ?, ?)",
                 (
-                    await get_conclusion_id(decision),
+                    await get_item_id("conclusions", "conclusion", decision),
                     datetime.now(),
                     cursor.lastrowid,
                 ),
@@ -69,9 +64,9 @@ async def db_iquiry_data(info, initiator, fullname, birthday):
                         fullname, 
                         birthday, 
                         datetime.now(), 
-                        get_category_id(Categories.candidate.value),
-                        get_region_id(Regions.MAIN_OFFICE.value),
-                        get_status_id(Statuses.finish.value),
+                        await get_item_id("categories", "category", Categories.candidate.value),
+                        await get_item_id("regions", "region", Regions.MAIN_OFFICE.value),
+                        await get_item_id("statuses", "status", Statuses.finish.value),
                     ),
                 )
                 result = [cursor.lastrowid]
@@ -141,9 +136,9 @@ async def json_to_db(json_data):
 async def excel_to_db(excel):
     if excel.get("resume"):
         excel["resume"] | {
-            "category_id": await get_category_id(Categories.candidate.value), 
-            "status_id": await get_status_id(Statuses.finish.value), 
-            "region_id": await get_region_id(Regions.MAIN_OFFICE.value),
+            "category_id": await get_item_id("categories", "category", Categories.candidate.value),
+            "status_id": await get_item_id("statuses", "status", Statuses.finish.value),
+            "region_id": await get_item_id("regions", "region", Regions.MAIN_OFFICE.value),
             }
 
         async with aiosqlite.connect(Config.DATABASE_URI) as db:

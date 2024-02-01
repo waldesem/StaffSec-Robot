@@ -4,12 +4,7 @@ from datetime import date, datetime
 
 from enums.classes import Categories, Statuses
 from database.dbase import json_to_db
-from action.actions import (
-    name_convert,
-    get_region_id,
-    get_category_id,
-    get_status_id,
-)
+from action.actions import name_convert, get_item_id
 
 
 async def screen_json(json_path, json_file):
@@ -22,8 +17,8 @@ async def screen_json(json_path, json_file):
             {
                 "resume": {
                     "region_id": await parse_region(json_dict),
-                    "category_id": await get_category_id(Categories.candidate.value),
-                    "status_id": await get_status_id(Statuses.finish.value),
+                    "category_id": await get_item_id("categories", "category", Categories.candidate.value),
+                    "status_id": await get_item_id("statuses", "status", Statuses.finish.value),
                     "fullname": await parse_fullname(json_dict),
                     "previous": await parse_previous(json_dict),
                     "birthday": json_dict.get("birthday", date.today()),
@@ -101,9 +96,9 @@ async def parse_region(json_dict):
         region_id = 1
         divisions = json_dict["department"].split("/")
         for div in divisions:
-            region = await get_region_id(div)
+            region = await get_item_id("regions", "region", div)
             if region:
-                region_id = region[0]
+                region_id = region
         return region_id
 
 
