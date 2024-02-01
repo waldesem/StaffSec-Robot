@@ -2,66 +2,18 @@ import os
 import json
 from datetime import date, datetime
 
-import aiosqlite
-
-from config import Config
-
-
-async def json_to_db(json_path, json_file):
-    json_data = await screen_json(os.path.join(json_path, json_file))
-
-    async with aiosqlite.connect(Config.DATABASE_URI) as db:
-        async with db.execute(
-            "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
-            (json_data["resume"]["fullname"], json_data["resume"]["birthday"]),
-        ) as cursor:
-            result = await cursor.fetchone()
-            person_id = result[0] if result else None
-
-            if person_id:
-                await db.execute(
-                    f"UPDATE persons SET {'=?,'.join(json_data['resume'].keys())}=?, updated=? "
-                    f"WHERE id = {person_id}",
-                    tuple(json_data["resume"].values()) + (datetime.now(),),
-                )
-            else:
-                await db.execute(
-                    f"INSERT INTO persons ({','.join(json_data['resume'].keys())},created) "
-                    f"VALUES ({','.join(['?'] * len(json_data['resume'].values()))},?)",
-                    tuple(json_data["resume"].values()) + (datetime.now(),),
-                )
-                person_id = cursor.lastrowid
-
-            models = [
-                "staffs",
-                "documents",
-                "addresses",
-                "contacts",
-                "workplaces",
-                "affilations",
-            ]
-            items_lists = [
-                json_data["staff"],
-                json_data["passport"],
-                json_data["addresses"],
-                json_data["contacts"],
-                json_data["workplaces"],
-                json_data["affilation"],
-            ]
-
-            for model, items_list in zip(models, items_lists):
-                for item in items_list:
-                    item["person_id"] = person_id
-                    await db.execute(
-                        f"INSERT INTO {model} ({','.join(item.keys())}) "
-                        f"VALUES ({','.join(['?'] * len(item.values()))})",
-                        tuple(item.values()),
-                    )
-
-        await db.commit()
+from enums.classes import Categories, Statuses
+from database.dbase import json_to_db
+from action.actions import (
+    name_convert,
+    get_region_id,
+    get_category_id,
+    get_status_id,
+)
 
 
-async def screen_json(file):
+async def screen_json(json_path, json_file):
+    file = os.path.join(json_path, json_file)
     with open(file, "r", newline="", encoding="utf-8-sig") as f:
         json_dict = json.load(f)
         json_data = {}
@@ -70,8 +22,8 @@ async def screen_json(file):
             {
                 "resume": {
                     "region_id": await parse_region(json_dict),
-                    "category_id": await get_category_id("Кандидат"),
-                    "status_id": await get_status_id("Окончено"),
+                    "category_id": await get_category_id(Categories.candidate.value),
+                    "status_id": await get_status_id(Statuses.finish.value),
                     "fullname": await parse_fullname(json_dict),
                     "previous": await parse_previous(json_dict),
                     "birthday": json_dict.get("birthday", date.today()),
@@ -141,33 +93,7 @@ async def screen_json(file):
         json_data.update({"workplaces": await parse_workplace(json_dict)})
         json_data.update({"affilation": await parse_affilation(json_dict)})
 
-        return json_data
-
-
-async def get_category_id(name):
-    async with aiosqlite.connect(Config.DATABASE_URI) as conn:
-        async with conn.execute(
-            "SELECT * FROM categories WHERE category = ?", (name,)
-        ) as cursor:
-            result = await cursor.fetchone()
-            return result[0] if result else 1
-
-
-async def get_status_id(name):
-    async with aiosqlite.connect(Config.DATABASE_URI) as conn:
-        async with conn.execute(
-            "SELECT * FROM statuses WHERE status = ?", (name,)
-        ) as cursor:
-            result = await cursor.fetchone()
-            return result[0] if result else 1
-
-
-async def get_region_id(name):
-    async with aiosqlite.connect(Config.DATABASE_URI) as conn:
-        async with conn.execute(
-            "SELECT id FROM regions WHERE region = ?", (name,)
-        ) as cursor:
-            return await cursor.fetchone()
+        await json_to_db(json_data)
 
 
 async def parse_region(json_dict):
@@ -182,10 +108,10 @@ async def parse_region(json_dict):
 
 
 async def parse_fullname(json_dict):
-    lastName = json_dict.get("lastName", "None").strip()
-    firstName = json_dict.get("firstName", "None").strip()
-    midName = json_dict.get("midName", "").strip()
-    return f"{lastName} {firstName} {midName}".upper().rstrip()
+    lastName = json_dict.get("lastName", "None")
+    firstName = json_dict.get("firstName", "None")
+    midName = json_dict.get("midName", "")
+    return name_convert(f"{lastName} {firstName} {midName}")
 
 
 async def parse_previous(json_dict):
