@@ -11,6 +11,7 @@ from parsers.jsonparser import screen_json
 from database.dbase import db_iquiry_data, db_main_data
 from action.actions import name_convert
 
+
 async def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True)
     ws = wb.worksheets[0]
@@ -53,8 +54,11 @@ async def parse_main():
                         ws["L" + str(i)].hyperlink = str(lnk)
 
                         try:
-                            shutil.move(subdir_path, lnk)
-                            logging.info(f"{sub} moved to {Config.ARCHIVE_DIR}")
+                            if not os.path.isdir(lnk):
+                                shutil.move(subdir_path, lnk)
+                                logging.info(f"{sub} moved to {Config.ARCHIVE_DIR}")
+                            else:
+                                logging.info(f"{sub} already in {Config.ARCHIVE_DIR}")
                         except Exception as e:
                             logging.error(e)
 
