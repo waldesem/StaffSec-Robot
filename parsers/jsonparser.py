@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import date, datetime
+from datetime import datetime
 
 from enums.classes import Categories, Statuses
 from database.dbase import json_to_db
@@ -17,11 +17,15 @@ async def screen_json(json_path, json_file):
             {
                 "resume": {
                     "region_id": await parse_region(json_dict),
-                    "category_id": await get_item_id("categories", "category", Categories.candidate.value),
-                    "status_id": await get_item_id("statuses", "status", Statuses.finish.value),
+                    "category_id": await get_item_id(
+                        "categories", "category", Categories.candidate.value
+                    ),
+                    "status_id": await get_item_id(
+                        "statuses", "status", Statuses.finish.value
+                    ),
                     "fullname": await parse_fullname(json_dict),
                     "previous": await parse_previous(json_dict),
-                    "birthday": json_dict.get("birthday", date.today()),
+                    "birthday": json_dict.get("birthday"),
                     "birthplace": json_dict.get("birthplace", ""),
                     "country": json_dict.get("citizen" ""),
                     "ext_country": json_dict.get("additionalCitizenship", ""),
@@ -88,29 +92,37 @@ async def screen_json(json_path, json_file):
         json_data.update({"workplaces": await parse_workplace(json_dict)})
         json_data.update({"affilation": await parse_affilation(json_dict)})
 
-        await json_to_db(json_data)
+        if all(
+            [
+                json_data["resume"]["fullname"] is not None,
+                json_data["resume"]["birthday"] is not None,
+            ]
+        ):
+            await json_to_db(json_data)
 
 
 async def parse_region(json_dict):
-    if "department" in json_dict:
-        region_id = 1
+    region_id = 1
+    if json_dict.get("department") is not None:
         divisions = json_dict["department"].split("/")
         for div in divisions:
             region = await get_item_id("regions", "region", div)
             if region:
                 region_id = region
-        return region_id
+    return region_id
 
 
 async def parse_fullname(json_dict):
-    lastName = json_dict.get("lastName", "None")
-    firstName = json_dict.get("firstName", "None")
+    lastName = json_dict.get("lastName")
+    firstName = json_dict.get("firstName")
     midName = json_dict.get("midName", "")
+    if any([lastName is None, firstName is None]):
+        return None
     return name_convert(f"{lastName} {firstName} {midName}")
 
 
 async def parse_previous(json_dict):
-    if "hasNameChanged" in json_dict:
+    if json_dict.get("hasNameChanged") is not None:
         if len(json_dict["nameWasChanged"]):
             previous = []
             for item in json_dict["nameWasChanged"]:
@@ -129,7 +141,7 @@ async def parse_previous(json_dict):
 
 
 async def parse_education(json_dict):
-    if "education" in json_dict:
+    if json_dict.get("education") is not None:
         if len(json_dict["education"]):
             education = []
             for item in json_dict["education"]:
@@ -145,7 +157,7 @@ async def parse_education(json_dict):
 
 
 async def parse_workplace(json_dict):
-    if "experience" in json_dict:
+    if json_dict.get("experience") is not None:
         if len(json_dict["experience"]):
             experience = []
             for item in json_dict["experience"]:
@@ -153,9 +165,11 @@ async def parse_workplace(json_dict):
                     "start_date": datetime.strptime(
                         item.get("beginDate", "1900-01-01"), "%Y-%m-%d"
                     ),
-                    "end_date": datetime.strptime(item["endDate"], "%Y-%m-%d")
-                    if "endDate" in item
-                    else datetime.now(),
+                    "end_date": (
+                        datetime.strptime(item["endDate"], "%Y-%m-%d")
+                        if "endDate" in item
+                        else datetime.now()
+                    ),
                     "workplace": item.get("name", ""),
                     "address": item.get("address", ""),
                     "position": item.get("position", ""),

@@ -4,6 +4,8 @@ from config import Config
 
 
 async def get_item_id(table, column, name):
+    if not name or name is None:
+        return 1
     async with aiosqlite.connect(Config.DATABASE_URI) as conn:
         async with conn.execute(
             f"SELECT * FROM {table} WHERE LOWER ({column}) = ?", (name.lower(),)

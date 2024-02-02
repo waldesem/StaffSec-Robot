@@ -15,7 +15,7 @@ async def screen_excel(excel_path, excel_file):
     if excel_file.startswith("Заключение"):
         if len(workbook.sheetnames) > 1:
             sheet = workbook.worksheets[1]
-            
+
             if (
                 str(sheet["K1"].value) == "ФИО"
                 and sheet["K3"].value
@@ -35,45 +35,49 @@ async def screen_excel(excel_path, excel_file):
 
     workbook.close()
 
-    await excel_to_db(person)
+    if person["resume"]["fullname"] and person["resume"]["birthday"] != date.today():
+        await excel_to_db(person)
 
 
 async def get_resume(sheet):
-    resume = {
+    return {
         "fullname": name_convert(str(sheet["K3"].value)),
-        "birthday": datetime.strptime(sheet["L3"].value, "%d.%m.%Y").date()
-        if sheet["L3"].value
-        else date.today(),
+        "birthday": (
+            datetime.strptime(sheet["L3"].value, "%d.%m.%Y").date()
+            if sheet["L3"].value
+            else date.today()
+        ),
         "birthplace": str(sheet["M3"].value).strip(),
         "country": str(sheet["T3"].value).strip(),
         "snils": str(sheet["U3"].value).strip(),
         "inn": str(sheet["V3"].value).strip(),
     }
-    return resume
 
 
 async def get_conclusion_resume(sheet):
-    resumes = {
+    return {
         "fullname": name_convert(sheet["C6"].value),
-        "birthday": (sheet["C8"].value).date()
-        if isinstance(sheet["L3"].value, datetime)
-        else date.today(),
+        "birthday": (
+            (sheet["C8"].value).date()
+            if isinstance(sheet["L3"].value, datetime)
+            else date.today()
+        ),
     }
-    return resumes
 
 
 async def get_robot_resume(sheet):
-    resumes = {
+    return {
         "fullname": name_convert(sheet["B4"].value),
-        "birthday": datetime.strptime(sheet["B5"].value, "%d.%m.%Y").date()
-        if sheet["B5"].value
-        else date.today(),
+        "birthday": (
+            datetime.strptime(sheet["B5"].value, "%d.%m.%Y").date()
+            if sheet["B5"].value
+            else date.today()
+        ),
     }
-    return resumes
 
 
 async def get_check(sheet):
-    checks = {
+    return {
         "workplace": f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
         f"{sheet['D12'].value}; {sheet['C13'].value} - {sheet['D13'].value}",
         "cronos": f"{sheet['B14'].value}: {sheet['C14'].value}; {sheet['B15'].value}: "
@@ -85,19 +89,22 @@ async def get_check(sheet):
         "bki": sheet["C20"].value,
         "affilation": sheet["C21"].value,
         "internet": sheet["C22"].value,
-        "pfo": False
-        if sheet["C26"].value or str(sheet["C26"].value).lower() == "не назначалось"
-        else True,
+        "pfo": (
+            False
+            if sheet["C26"].value or str(sheet["C26"].value).lower() == "не назначалось"
+            else True
+        ),
         "addition": sheet["C28"].value,
-        "conclusion": await get_item_id("conclusions", "conclusion", sheet["C23"].value),
+        "conclusion": await get_item_id(
+            "conclusions", "conclusion", sheet["C23"].value
+        ),
         "deadline": datetime.now(),
         "officer": sheet["C25"].value,
     }
-    return checks
 
 
 async def get_robot(sheet):
-    robot = {
+    return {
         "employee": sheet["B27"].value,
         "terrorist": sheet["B17"].value,
         "inn": sheet["B18"].value,
@@ -107,4 +114,3 @@ async def get_robot(sheet):
         "bki": sheet["B25"].value,
         "deadline": datetime.now(),
     }
-    return robot
