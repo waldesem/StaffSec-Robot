@@ -64,7 +64,7 @@ async def db_iquiry_data(info, initiator, fullname, birthday):
                         fullname, 
                         birthday, 
                         datetime.now(), 
-                        await get_item_id("categories", "category", Categories.candidate.value),
+                        await get_item_id("categories", "category", Categories.staff.value),
                         await get_item_id("regions", "region", Regions.MAIN_OFFICE.value),
                         await get_item_id("statuses", "status", Statuses.finish.value),
                     ),

@@ -19,49 +19,24 @@ async def main():
     main_file_date = date.fromtimestamp(os.path.getmtime(Config.MAIN_FILE))
     info_file_date = date.fromtimestamp(os.path.getmtime(Config.INFO_FILE))
 
-    tasks = [
-        archive_db(main_file_date, info_file_date),
-        archive_main(main_file_date),
-        archive_info(info_file_date),
-    ]
-    await asyncio.gather(*tasks)
+    if date.today() in [main_file_date, info_file_date]:
+        for file in [Config.MAIN_FILE, Config.INFO_FILE, Config.DATABASE_URI]:
+            try:
+                shutil.copy(file, Config.ARCHIVE_DIR)
+                logging.info(f"{file} copied to {Config.ARCHIVE_DIR}")
+            except Exception as e:
+                logging.error(e)
+
+        tasks = [
+            parse_main(),
+            parse_inquiry(),
+        ]
+        await asyncio.gather(*tasks)
+
+    else:
+        logging.info("Files not changed")
 
     logging.info(f"Script execution time: {datetime.now() - now}")
-
-
-async def archive_db(main_file_date, info_file_date):
-    if date.today() in [main_file_date, info_file_date]:
-        try:
-            shutil.copy(os.path.join(Config.BASE_PATH, "persons.db"), Config.ARCHIVE_DIR)
-            logging.info(f"persons.db copied to {Config.ARCHIVE_DIR}")
-        except Exception as e:
-            logging.error(e)
-    else:
-        logging.info(f"persons.db not changed")
-
-
-async def archive_main(main_file_date):
-    if date.today() == main_file_date:
-        try:
-            shutil.copy(Config.MAIN_FILE, Config.ARCHIVE_DIR)
-            logging.info(f"Main file copied to {Config.ARCHIVE_DIR}")
-            await parse_main()
-        except Exception as e:
-            logging.error(e)
-    else:
-        logging.info(f"Main file not changed")
-
-
-async def archive_info(info_file_date):
-    if date.today() == info_file_date:
-        try:
-            shutil.copy(Config.INFO_FILE, Config.ARCHIVE_DIR)
-            logging.info(f"Info file copied to {Config.ARCHIVE_DIR}")
-            await parse_inquiry()
-        except Exception as e:
-            logging.error(e)
-    else:
-        logging.info(f"Info file not changed")
 
 
 if __name__ == "__main__":
