@@ -23,10 +23,10 @@ async def screen_excel(excel_path, excel_file):
             ):
                 person.update({"resume": await get_resume(sheet)})
 
-        if sheet["C6"].value and sheet["C8"].value:
+        if worksheet["C6"].value and worksheet["C8"].value:
             person.update({"resume": await get_conclusion_resume(worksheet)})
 
-        if sheet["C23"].value:
+        if worksheet["C23"].value:
             person.update({"check": await get_check(worksheet)})
 
     else:
@@ -35,8 +35,12 @@ async def screen_excel(excel_path, excel_file):
 
     workbook.close()
 
-    if person["resume"]["fullname"] and person["resume"]["birthday"] != date.today():
-        await excel_to_db(person)
+    if "resume" in person:
+        if (
+            person["resume"]["fullname"]
+            and person["resume"]["birthday"] != date.today()
+        ):
+            await excel_to_db(person)
 
 
 async def get_resume(sheet):
