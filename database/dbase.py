@@ -36,15 +36,6 @@ async def db_main_data(fullname, birthday, decision, url):
                     (url, datetime.now(), result[0]),
                 )
 
-            await db.execute(
-                "INSERT INTO checks (conclusion, deadline, person_id) VALUES (?, ?, ?)",
-                (
-                    await get_item_id("conclusions", "conclusion", decision),
-                    datetime.now(),
-                    cursor.lastrowid,
-                ),
-            )
-
             await db.commit()
 
 
@@ -135,11 +126,11 @@ async def json_to_db(json_data):
 
 async def excel_to_db(excel):
     if excel.get("resume"):
-        excel["resume"] | {
+        excel["resume"].update({
             "category_id": await get_item_id("categories", "category", Categories.candidate.value),
             "status_id": await get_item_id("statuses", "status", Statuses.finish.value),
             "region_id": await get_item_id("regions", "region", Regions.MAIN_OFFICE.value),
-            }
+            })
 
         async with aiosqlite.connect(Config.DATABASE_URI) as db:
             async with db.execute(
@@ -147,14 +138,18 @@ async def excel_to_db(excel):
                 (excel["resume"]["fullname"], excel["resume"]["birthday"]),
             ) as cursor:
                 result = await cursor.fetchone()
-                person_id = result[0] if result else None
+                if result:
+                    person_id = result[0]
+                else:
+                    person_id = None
 
             if not person_id:
-                await db.execute(
+                cursor = await db.execute(
                     f"INSERT INTO persons ({','.join(excel['resume'].keys())},created) "
                     f"VALUES ({','.join(['?'] * len(excel['resume'].values()))},?)",
                     tuple(excel["resume"].values()) + (datetime.now(),),
                 )
+                await db.commit()
                 person_id = cursor.lastrowid
             else:
                 await db.execute(

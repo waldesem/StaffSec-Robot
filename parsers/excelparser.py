@@ -28,7 +28,6 @@ async def screen_excel(excel_path, excel_file):
 
         if worksheet["C23"].value:
             person.update({"check": await get_check(worksheet)})
-
     else:
         person.update({"resume": await get_robot_resume(worksheet)})
         person.update({"robot": await get_robot(worksheet)})
@@ -62,9 +61,7 @@ async def get_conclusion_resume(sheet):
     return {
         "fullname": name_convert(sheet["C6"].value),
         "birthday": (
-            (sheet["C8"].value).date()
-            if isinstance(sheet["L3"].value, datetime)
-            else date.today()
+            datetime.strptime(sheet["C8"].value, "%d.%m.%Y")
         ),
     }
 
