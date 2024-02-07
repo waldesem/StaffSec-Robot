@@ -46,9 +46,13 @@ async def get_resume(sheet):
     return {
         "fullname": name_convert(str(sheet["K3"].value)),
         "birthday": (
-            datetime.strptime(sheet["L3"].value, "%d.%m.%Y").date()
-            if sheet["L3"].value
-            else date.today()
+            (sheet["L3"].value).date()
+            if isinstance(sheet["L3"].value, datetime)
+            else (
+                datetime.strptime(sheet["L3"].value, "%d.%m.%Y").date()
+                if sheet["L3"].value
+                else date.today()
+            )
         ),
         "birthplace": str(sheet["M3"].value).strip(),
         "country": str(sheet["T3"].value).strip(),
@@ -61,7 +65,13 @@ async def get_conclusion_resume(sheet):
     return {
         "fullname": name_convert(sheet["C6"].value),
         "birthday": (
-            datetime.strptime(sheet["C8"].value, "%d.%m.%Y")
+            (sheet["C8"].value).date()
+            if isinstance(sheet["C8"].value, datetime)
+            else (
+                datetime.strptime(sheet["C8"].value, "%d.%m.%Y").date()
+                if sheet["C8"].value
+                else date.today()
+            )
         ),
     }
 
@@ -70,9 +80,13 @@ async def get_robot_resume(sheet):
     return {
         "fullname": name_convert(sheet["B4"].value),
         "birthday": (
-            datetime.strptime(sheet["B5"].value, "%d.%m.%Y").date()
-            if sheet["B5"].value
-            else date.today()
+            (sheet["B5"].value).date()
+            if isinstance(sheet["B5"].value, datetime)
+            else (
+                datetime.strptime(sheet["B5"].value, "%d.%m.%Y").date()
+                if sheet["B5"].value
+                else date.today()
+            )
         ),
     }
 
