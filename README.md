@@ -17,4 +17,4 @@ pyinstaller --clean robot.py
 ```
 
 ### Diagram of the project
-![Diagram](https://github.com/waldesem/Web-Personal-DB/blob/main/robot_parser.png?raw=true)
+![Diagram](https://github.com/waldesem/StaffSec-Robot/blob/main/robot_parser.png?raw=true)
