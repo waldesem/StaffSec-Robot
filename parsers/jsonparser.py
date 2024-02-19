@@ -104,7 +104,7 @@ async def screen_json(json_path, json_file):
 async def parse_region(json_dict):
     region_id = 1
     if json_dict.get("department") is not None:
-        divisions = json_dict["department"].split("/")
+        divisions = json_dict.get("department").split("/")
         for div in divisions:
             region = await get_item_id("regions", "region", div)
             if region:
@@ -122,10 +122,10 @@ async def parse_fullname(json_dict):
 
 
 async def parse_previous(json_dict):
-    if json_dict.get("hasNameChanged") is not None:
-        if len(json_dict["nameWasChanged"]):
+    if json_dict.get("hasNameChanged"):
+        if len(json_dict.get("nameWasChanged")):
             previous = []
-            for item in json_dict["nameWasChanged"]:
+            for item in json_dict.get("nameWasChanged"):
                 firstNameBeforeChange = item.get("firstNameBeforeChange", "")
                 lastNameBeforeChange = item.get("lastNameBeforeChange", "")
                 midNameBeforeChange = item.get("midNameBeforeChange", "")
@@ -141,10 +141,10 @@ async def parse_previous(json_dict):
 
 
 async def parse_education(json_dict):
-    if json_dict.get("education") is not None:
-        if len(json_dict["education"]):
+    if json_dict.get("education"):
+        if len(json_dict.get("education")):
             education = []
-            for item in json_dict["education"]:
+            for item in json_dict.get("education"):
                 institutionName = item.get("institutionName")
                 endYear = item.get("endYear", "н.в.")
                 specialty = item.get("specialty")
@@ -157,10 +157,10 @@ async def parse_education(json_dict):
 
 
 async def parse_workplace(json_dict):
-    if json_dict.get("experience") is not None:
-        if len(json_dict["experience"]):
+    if json_dict.get("experience"):
+        if len(json_dict.get("experience")):
             experience = []
-            for item in json_dict["experience"]:
+            for item in json_dict.get("experience"):
                 work = {
                     "start_date": datetime.strptime(
                         item.get("beginDate", "1900-01-01"), "%Y-%m-%d"
@@ -182,9 +182,9 @@ async def parse_workplace(json_dict):
 
 async def parse_affilation(json_dict):
     affilation = []
-    if json_dict["hasPublicOfficeOrganizations"]:
-        if len(json_dict["publicOfficeOrganizations"]):
-            for item in json_dict["publicOfficeOrganizations"]:
+    if json_dict.get("hasPublicOfficeOrganizations"):
+        if len(json_dict.get("publicOfficeOrganizations")):
+            for item in json_dict.get("publicOfficeOrganizations"):
                 public = {
                     "view": "Являлся государственным или муниципальным служащим",
                     "name": f"{item.get('name', '')}",
@@ -192,9 +192,9 @@ async def parse_affilation(json_dict):
                 }
                 affilation.append(public)
 
-    if json_dict["hasStateOrganizations"]:
-        if len(json_dict["stateOrganizations"]):
-            for item in json_dict["publicOfficeOrganizations"]:
+    if json_dict.get("hasStateOrganizations"):
+        if len(json_dict.get("stateOrganizations")):
+            for item in json_dict.get("publicOfficeOrganizations"):
                 state = {
                     "view": "Являлся государственным должностным лицом",
                     "name": f"{item.get('name', '')}",
@@ -202,9 +202,9 @@ async def parse_affilation(json_dict):
                 }
                 affilation.append(state)
 
-    if json_dict["hasRelatedPersonsOrganizations"]:
-        if len(json_dict["relatedPersonsOrganizations"]):
-            for item in json_dict["relatedPersonsOrganizations"]:
+    if json_dict.get("hasRelatedPersonsOrganizations"):
+        if len(json_dict.get("relatedPersonsOrganizations")):
+            for item in json_dict.get("relatedPersonsOrganizations"):
                 related = {
                     "view": "Связанные лица работают в госудраственных организациях",
                     "name": f"{item.get('name', '')}",
@@ -213,9 +213,9 @@ async def parse_affilation(json_dict):
                 }
                 affilation.append(related)
 
-    if json_dict["hasOrganizations"]:
-        if len(json_dict["organizations"]):
-            for item in json_dict["organizations"]:
+    if json_dict.get("hasOrganizations"):
+        if len(json_dict.get("organizations")):
+            for item in json_dict.get("organizations"):
                 organization = {
                     "view": 'Участвует в деятельности коммерческих организаций"',
                     "name": f"{item.get('name', '')}",
