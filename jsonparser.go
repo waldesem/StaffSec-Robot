@@ -10,90 +10,93 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type NameChange struct {
-	Reason                   string `json:"reason"`
-	FirstNameBeforeChange    string `json:"firstNameBeforeChange"`
-	LastNameBeforeChange     string `json:"lastNameBeforeChange"`
-	HasNoMidNameBeforeChange bool   `json:"hasNoMidNameBeforeChange"`
-	YearOfChange             int    `json:"yearOfChange"`
-	NameChangeDocument       string `json:"nameChangeDocument"`
+	Reason                   string `json:"reason" validate:"required"`
+	FirstNameBeforeChange    string `json:"firstNameBeforeChange" validate:"required"`
+	LastNameBeforeChange     string `json:"lastNameBeforeChange" validate:"required"`
+	HasNoMidNameBeforeChange bool   `json:"hasNoMidNameBeforeChange" validate:"required"`
+	YearOfChange             int    `json:"yearOfChange" validate:"required"`
+	NameChangeDocument       string `json:"nameChangeDocument" validate:"required"`
 }
 
 type Education struct {
-	EducationType   string `json:"educationType"`
-	InstitutionName string `json:"institutionName"`
-	BeginYear       int    `json:"beginYear"`
-	EndYear         int    `json:"endYear"`
-	Specialty       string `json:"specialty"`
+	EducationType   string `json:"educationType" validate:"required"`
+	InstitutionName string `json:"institutionName" validate:"required"`
+	BeginYear       int    `json:"beginYear" validate:"required"`
+	EndYear         int    `json:"endYear" validate:"required"`
+	Specialty       string `json:"specialty" validate:"required"`
 }
 
 type Experience struct {
-	BeginDate                         string `json:"beginDate"`
-	EndDate                           string `json:"endDate,omitempty"`
-	CurrentJob                        bool   `json:"currentJob,omitempty"`
-	Name                              string `json:"name"`
-	Address                           string `json:"address"`
-	Phone                             string `json:"phone"`
-	ActivityType                      string `json:"activityType"`
-	Position                          string `json:"position"`
-	IsPositionMatchEmploymentContract bool   `json:"isPositionMatchEmploymentContract,omitempty"`
-	EmploymentContractPosition        string `json:"employmentContractPosition,omitempty"`
-	FireReason                        string `json:"fireReason,omitempty"`
+	BeginDate                         string `json:"beginDate" validate:"required"`
+	EndDate                           string `json:"endDate,omitempty" validate:"required"`
+	CurrentJob                        bool   `json:"currentJob,omitempty" validate:"required"`
+	Name                              string `json:"name" validate:"required"`
+	Address                           string `json:"address" validate:"required"`
+	Phone                             string `json:"phone" validate:"required"`
+	ActivityType                      string `json:"activityType" validate:"required"`
+	Position                          string `json:"position" validate:"required"`
+	IsPositionMatchEmploymentContract bool   `json:"isPositionMatchEmploymentContract,omitempty" validate:"required"`
+	EmploymentContractPosition        string `json:"employmentContractPosition,omitempty" validate:"required"`
+	FireReason                        string `json:"fireReason,omitempty" validate:"required"`
 }
 
 type Organization struct {
-	View     string `json:"view"`
-	Inn      string `json:"inn"`
-	OrgType  string `json:"orgType"`
-	Name     string `json:"name"`
-	Position string `json:"position"`
+	View     string `json:"view" validate:"required"`
+	Inn      string `json:"inn" validate:"required"`
+	OrgType  string `json:"orgType" validate:"required"`
+	Name     string `json:"name" validate:"required"`
+	Position string `json:"position" validate:"required"`
 }
 
 type Person struct {
-	PositionName                      string         `json:"positionName"`
-	Department                        string         `json:"department"`
-	StatusDate                        string         `json:"statusDate"`
-	LastName                          string         `json:"lastName"`
-	FirstName                         string         `json:"firstName"`
-	MidName                           string         `json:"midName"`
-	HasNameChanged                    bool           `json:"hasNameChanged"`
-	NameWasChanged                    []NameChange   `json:"nameWasChanged"`
-	Birthday                          string         `json:"birthday"`
-	Birthplace                        string         `json:"birthplace"`
-	Citizen                           string         `json:"citizen"`
+	PositionName                      string         `json:"positionName" validate:"required"`
+	Department                        string         `json:"department" validate:"required"`
+	StatusDate                        string         `json:"statusDate" validate:"required"`
+	LastName                          string         `json:"lastName" validate:"required"`
+	FirstName                         string         `json:"firstName" validate:"required"`
+	MidName                           string         `json:"midName" validate:"required"`
+	HasNameChanged                    bool           `json:"hasNameChanged" validate:"required"`
+	NameWasChanged                    []NameChange   `json:"nameWasChanged" validate:"required"`
+	Birthday                          string         `json:"birthday" validate:"required"`
+	Birthplace                        string         `json:"birthplace" validate:"required"`
+	Citizen                           string         `json:"citizen" validate:"required"`
 	HasAdditionalCitizenship          bool           `json:"hasAdditionalCitizenship"`
-	AdditionalCitizenship             string         `json:"additionalCitizenship"`
-	MaritalStatus                     string         `json:"maritalStatus"`
-	RegAddress                        string         `json:"regAddress"`
-	ValidAddress                      string         `json:"validAddress"`
-	ContactPhone                      string         `json:"contactPhone"`
-	HasNoRussianContactPhone          bool           `json:"hasNoRussianContactPhone"`
-	Email                             string         `json:"email"`
-	HasInn                            bool           `json:"hasInn"`
-	Inn                               string         `json:"inn"`
-	HasSnils                          bool           `json:"hasSnils"`
-	Snils                             string         `json:"snils"`
-	PassportSerial                    string         `json:"passportSerial"`
-	PassportNumber                    string         `json:"passportNumber"`
-	PassportIssueDate                 string         `json:"passportIssueDate"`
-	PassportIssuedBy                  string         `json:"passportIssuedBy"`
-	Education                         []Education    `json:"education"`
-	HasJob                            bool           `json:"hasJob"`
-	Experience                        []Experience   `json:"experience"`
-	HasPublicOfficeOrganizations      bool           `json:"hasPublicOfficeOrganizations"`
-	PublicOfficeOrganizations         []Organization `json:"publicOfficeOrganizations"`
-	HasStateOrganizations             bool           `json:"hasStateOrganizations"`
-	StateOrganizations                []Organization `json:"stateOrganizations"`
-	HasRelatedPersonsOrganizations    bool           `json:"hasRelatedPersonsOrganizations"`
-	RelatedPersonsOrganizations       []Organization `json:"relatedPersonsOrganizations"`
-	HasMtsRelatedPersonsOrganizations bool           `json:"hasMtsRelatedPersonsOrganizations"`
-	MtsRelatedPersonsOrganizations    []Organization `json:"mtsRelatedPersonsOrganizations"`
-	HasOrganizations                  bool           `json:"hasOrganizations"`
-	Organizations                     []Organization `json:"organizations"`
+	AdditionalCitizenship             string         `json:"additionalCitizenship" validate:"required"`
+	MaritalStatus                     string         `json:"maritalStatus" validate:"required"`
+	RegAddress                        string         `json:"regAddress" validate:"required"`
+	ValidAddress                      string         `json:"validAddress" validate:"required"`
+	ContactPhone                      string         `json:"contactPhone" validate:"required"`
+	HasNoRussianContactPhone          bool           `json:"hasNoRussianContactPhone" validate:"required"`
+	Email                             string         `json:"email" validate:"required"`
+	HasInn                            bool           `json:"hasInn" validate:"required"`
+	Inn                               string         `json:"inn" validate:"required"`
+	HasSnils                          bool           `json:"hasSnils" validate:"required"`
+	Snils                             string         `json:"snils" validate:"required"`
+	PassportSerial                    string         `json:"passportSerial" validate:"required"`
+	PassportNumber                    string         `json:"passportNumber" validate:"required"`
+	PassportIssueDate                 string         `json:"passportIssueDate" validate:"required"`
+	PassportIssuedBy                  string         `json:"passportIssuedBy" validate:"required"`
+	Education                         []Education    `json:"education" validate:"required"`
+	HasJob                            bool           `json:"hasJob" validate:"required"`
+	Experience                        []Experience   `json:"experience" validate:"required"`
+	HasPublicOfficeOrganizations      bool           `json:"hasPublicOfficeOrganizations" validate:"required"`
+	PublicOfficeOrganizations         []Organization `json:"publicOfficeOrganizations" validate:"required"`
+	HasStateOrganizations             bool           `json:"hasStateOrganizations" validate:"required"`
+	StateOrganizations                []Organization `json:"stateOrganizations" validate:"required"`
+	HasRelatedPersonsOrganizations    bool           `json:"hasRelatedPersonsOrganizations" validate:"required"`
+	RelatedPersonsOrganizations       []Organization `json:"relatedPersonsOrganizations" validate:"required"`
+	HasMtsRelatedPersonsOrganizations bool           `json:"hasMtsRelatedPersonsOrganizations" validate:"required"`
+	MtsRelatedPersonsOrganizations    []Organization `json:"mtsRelatedPersonsOrganizations" validate:"required"`
+	HasOrganizations                  bool           `json:"hasOrganizations" validate:"required"`
+	Organizations                     []Organization `json:"organizations" validate:"required"`
 }
+
+var validate *validator.Validate
 
 func jsonParse(db *sql.DB, jsonPath string, jsonFile string) {
 	queries := map[string]string{
@@ -129,6 +132,15 @@ func jsonParse(db *sql.DB, jsonPath string, jsonFile string) {
 	if err != nil {
 		log.Println(err)
 		return
+	}
+
+	validate = validator.New(validator.WithRequiredStructEnabled())
+	err = validate.Struct(person)
+	if err != nil {
+		if e, ok := err.(*validator.InvalidValidationError); ok {
+			fmt.Println(e)
+			return
+		}
 	}
 
 	result := db.QueryRow(
