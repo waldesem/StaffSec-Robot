@@ -13,6 +13,17 @@ logging.basicConfig(
 )
 
 
+"""
+main is an async function that runs the main robot logic.
+
+It checks if the main and info files were modified today. 
+If so, it archives them, logs the copy, and parses them by 
+calling parse_main and parse_inquiry async tasks.
+
+If the files were not changed, it just logs that info.
+
+Finally it logs how long the script took to run.
+"""
 async def main():
     now = datetime.now()
 

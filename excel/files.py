@@ -12,6 +12,18 @@ from database.dbase import db_iquiry_data, db_main_data
 from action.actions import name_convert
 
 
+"""Parses the main Excel file to get today's records, screens them, 
+archives processed records, and saves results to the database.
+
+- Loads the main Excel file 
+- Iterates over today's records
+    - Gets key data for the record
+    - Finds the matching subdirectory
+    - Screens Excel/JSON files in the subdirectory
+    - Archives the subdirectory
+    - Saves record data to the database
+- Saves the updated main Excel file
+"""
 async def parse_main():
     wb = load_workbook(Config.MAIN_FILE, keep_vba=True)
     ws = wb.worksheets[0]
@@ -71,6 +83,15 @@ async def parse_main():
     logging.info("Main file parsed")
 
 
+"""Parse the inquiry worksheet in the info Excel file.
+
+Iterates through the date column, checking for today's date. 
+For each row with today's date, extracts the info, initiator, 
+fullname, and birthday, and saves to the database.
+
+After processing the whole worksheet, closes the workbook and logs 
+that the info file was parsed.
+"""
 async def parse_inquiry():
     wb = load_workbook(Config.INFO_FILE, keep_vba=True)
     ws = wb.worksheets[0]

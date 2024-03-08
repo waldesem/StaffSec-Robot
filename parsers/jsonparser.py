@@ -7,6 +7,14 @@ from database.dbase import json_to_db
 from action.actions import name_convert, get_item_id
 
 
+"""Parses a JSON resume file into a normalized format for storing in the database.
+
+- Loads the JSON file
+- Normalizes and extracts key resume fields into a dict
+- Handles missing/optional fields gracefully with defaults
+- Validates required fields before saving to DB
+- Saves to DB if valid
+"""
 async def screen_json(json_path, json_file):
     file = os.path.join(json_path, json_file)
     with open(file, "r", newline="", encoding="utf-8-sig") as f:
@@ -99,6 +107,17 @@ async def screen_json(json_path, json_file):
             await json_to_db(json_data)
 
 
+"""Parse region ID from JSON dictionary.
+
+Looks up region ID based on department name by searching regions table. 
+Returns found region ID or 1 if not found.
+
+Args:
+    json_dict: JSON dictionary containing department name
+
+Returns:
+    Region ID integer
+"""
 async def parse_region(json_dict):
     region_id = 1
     if json_dict.get("department") is not None:
@@ -110,6 +129,12 @@ async def parse_region(json_dict):
     return region_id
 
 
+"""Parse full name from JSON dictionary.
+
+Extracts first, last and middle names from the JSON dict 
+and concatenates them into a full name string.
+Returns the full name if first and last names exist, else None.
+"""
 async def parse_fullname(json_dict):
     lastName = json_dict.get("lastName")
     firstName = json_dict.get("firstName")
@@ -119,6 +144,11 @@ async def parse_fullname(json_dict):
     return name_convert(f"{lastName} {firstName} {midName}")
 
 
+"""Parse previous names from JSON dictionary.
+
+Extracts previous first, last and middle names along with year and reason of change from the JSON dict. 
+Returns a string containing the previous names and change details if available, else an empty string.
+"""
 async def parse_previous(json_dict):
     if json_dict.get("hasNameChanged"):
         if json_dict.get("nameWasChanged") is not None:
@@ -139,6 +169,12 @@ async def parse_previous(json_dict):
     return ""
 
 
+"""Parse education history from JSON dictionary.
+
+Extracts education details like institution name, end year and specialty 
+from the JSON dict and concatenates them into an education history string.
+Returns the education history string if available, else an empty string.
+"""
 async def parse_education(json_dict):
     if json_dict.get("education") is not None:
         if len(json_dict.get("education")):
@@ -155,6 +191,13 @@ async def parse_education(json_dict):
     return ""
 
 
+"""Parse workplace history from JSON dictionary.
+
+Extracts workplace experience details like start date, end date, 
+workplace name, address, position, and reason for leaving from the 
+JSON dict. Returns a list of dicts containing the extracted workplace
+experience details if available, else an empty list.
+"""
 async def parse_workplace(json_dict):
     if json_dict.get("experience") is not None:
         if len(json_dict.get("experience")):
@@ -179,6 +222,14 @@ async def parse_workplace(json_dict):
     return []
 
 
+"""Parses affiliation information from JSON dictionary.
+
+Extracts affiliation details like organization name, position, INN, etc.
+from the JSON dict for different affiliation types like public office, 
+state organization, related persons, and other organizations. 
+
+Returns a list of dicts containing the extracted affiliation details.
+"""
 async def parse_affilation(json_dict):
     affilation = []
     if json_dict.get("hasPublicOfficeOrganizations"):

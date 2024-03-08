@@ -8,6 +8,18 @@ from action.actions import get_item_id
 from config import Config
 
 
+"""
+db_main_data asynchronously inserts or updates a person record in the database.
+
+Parameters:
+- fullname (str): The person's full name.  
+- birthday (datetime): The person's date of birth.
+- url (str): The url/path to the person's profile.
+
+It first checks if a record already exists for the given fullname and birthday. 
+If not, it inserts a new record. If so, it updates the existing record's path and 
+updated fields.
+"""
 async def db_main_data(fullname, birthday, url):
     async with aiosqlite.connect(Config.DATABASE_URI) as db:
         async with db.execute(
@@ -39,6 +51,20 @@ async def db_main_data(fullname, birthday, url):
             await db.commit()
 
 
+"""
+db_iquiry_data asynchronously inserts a person record and inquiry record in the database.
+
+It first checks if a record already exists for the given fullname and birthday.
+If not, it inserts a new person record. 
+
+It then inserts a new inquiry record, linking it to the person record.
+
+Parameters:
+- info (str): Details about the inquiry.
+- initiator (str): Name of person initiating inquiry.  
+- fullname (str): The person's full name.
+- birthday (datetime): The person's date of birth.
+"""
 async def db_iquiry_data(info, initiator, fullname, birthday):
     async with aiosqlite.connect(Config.DATABASE_URI) as db:
         async with db.execute(
@@ -72,6 +98,19 @@ async def db_iquiry_data(info, initiator, fullname, birthday):
 
 
 
+"""
+json_to_db asynchronously inserts person data from JSON into the database.
+
+It first checks if a person record already exists matching the fullname and birthday. 
+If so, it updates that existing record.
+Otherwise, it inserts a new person record.
+
+It then inserts related records in other tables like staff, documents, etc. 
+linking them to the person record.
+
+Parameters:
+- json_data (dict): The JSON data to insert into the database.
+"""
 async def json_to_db(json_data):
     async with aiosqlite.connect(Config.DATABASE_URI) as db:
         async with db.execute(
@@ -124,6 +163,13 @@ async def json_to_db(json_data):
         await db.commit()
 
 
+"""Updates a database with data from an Excel file.
+
+Iterates through the Excel data, checking if a person record exists. If not, creates a new person record. 
+Updates the person record with the latest data. Also inserts related check and robot data referencing the person ID.
+
+Commits changes after inserting/updating each record.
+"""
 async def excel_to_db(excel):
     if excel.get("resume"):
         excel["resume"].update({

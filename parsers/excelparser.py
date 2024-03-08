@@ -7,6 +7,19 @@ from database.dbase import excel_to_db
 from action.actions import name_convert, get_item_id
 
 
+"""Parses an Excel file to extract resume and other data.
+
+Args:
+  excel_path: Path to the directory containing the Excel file.
+  excel_file: Name of the Excel file.
+
+Returns:
+  None. Data is inserted into the database.
+
+This function loads the given Excel file, extracts resume and other data 
+based on the sheet name and cell contents, converts names, gets item IDs,
+and inserts the data into the database if valid.
+"""
 async def screen_excel(excel_path, excel_file):
     workbook = load_workbook(os.path.join(excel_path, excel_file), keep_vba=True)
     worksheet = workbook.worksheets[0]
@@ -42,6 +55,14 @@ async def screen_excel(excel_path, excel_file):
             await excel_to_db(person)
 
 
+"""Parses resume data from the given sheet.
+
+Args:
+  sheet: The sheet containing resume data.
+
+Returns: 
+  A dict with the parsed resume fields.
+"""
 async def get_resume(sheet):
     return {
         "fullname": name_convert(str(sheet["K3"].value)),
@@ -61,6 +82,14 @@ async def get_resume(sheet):
     }
 
 
+"""Parses resume conclusion data from the given sheet.
+
+Args:
+  sheet: The sheet containing resume conclusion data. 
+
+Returns:
+  A dict with the parsed resume conclusion fields.
+"""
 async def get_conclusion_resume(sheet):
     return {
         "fullname": name_convert(sheet["C6"].value),
@@ -76,6 +105,14 @@ async def get_conclusion_resume(sheet):
     }
 
 
+"""Parses robot resume data from the given sheet.
+
+Args:
+  sheet: The sheet containing robot resume data.
+
+Returns:
+  A dict with the parsed robot resume fields.
+"""
 async def get_robot_resume(sheet):
     return {
         "fullname": name_convert(sheet["B4"].value),
@@ -91,6 +128,14 @@ async def get_robot_resume(sheet):
     }
 
 
+"""Parses check data from the given sheet.
+
+Args:
+  sheet: The sheet containing check data.
+
+Returns:
+  A dict with the parsed check fields.
+"""
 async def get_check(sheet):
     return {
         "workplace": f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
@@ -118,6 +163,14 @@ async def get_check(sheet):
     }
 
 
+"""Parses robot check data from the given sheet.
+
+Args:
+  sheet: The sheet containing robot check data. 
+
+Returns:
+  A dict with the parsed robot check fields.
+"""
 async def get_robot(sheet):
     return {
         "employee": sheet["B27"].value,
