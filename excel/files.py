@@ -64,7 +64,7 @@ async def parse_main():
 
                         break
 
-                await db_main_data(fullname, birthday, decision, lnk)
+                await db_main_data(fullname, birthday, lnk)
 
     wb.save(Config.MAIN_FILE)
     wb.close()

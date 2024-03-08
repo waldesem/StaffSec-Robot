@@ -8,7 +8,7 @@ from action.actions import get_item_id
 from config import Config
 
 
-async def db_main_data(fullname, birthday, decision, url):
+async def db_main_data(fullname, birthday, url):
     async with aiosqlite.connect(Config.DATABASE_URI) as db:
         async with db.execute(
             "SELECT * FROM persons WHERE fullname = ? AND birthday = ?",
