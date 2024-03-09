@@ -36,41 +36,40 @@ async def parse_main(file):
                 and isinstance(c.value, datetime)
                 and (c.value).date() == date.today()
             ):
-                fullname = name_convert(ws["B" + str(i)].value)
                 today_records.update({
                     str(i): {
-                        "fullname": fullname,
+                        "fullname": name_convert(ws["B" + str(i)].value),
                         "birthday": 
-                            ws["C" + str(record)].value.date()
-                            if isinstance(ws["C" + str(record)].value, datetime)
+                            ws["C" + str(i)].value.date()
+                            if isinstance(ws["C" + str(i)].value, datetime)
                             else date.today(),
-                        "link": os.path.join(
-                            Config.ARCHIVE_DIR,
-                            fullname[0],
-                            f"{fullname.capitalize()} - {ws['A' + record].value}",
-                        ),
+                        "id": ws['A' + str(i)].value,
                     }
                 })
-    
+
     subdirs = os.listdir(Config.WORK_DIR)
-    for record in today_records:
+    for key, value in today_records.items():
         link = ""
 
         for sub in subdirs:
-            if name_convert(sub) == record["fullname"]:
+            if name_convert(sub) == value["fullname"]:
                 subdir_path = os.path.join(Config.WORK_DIR, sub)
 
                 await scan_subdir(subdir_path)
 
-                link = record["link"]
+                link = os.path.join(
+                            Config.ARCHIVE_DIR,
+                            sub[0],
+                            f"{sub} - {value['id']}"
+                )
                 if link:
-                    ws["L" + record].hyperlink = link
+                    ws["L" + key].hyperlink = link
 
                 move_subdir(subdir_path, sub, link)
 
                 break
 
-        await db_main_data(record['fullname'], record['birthday'], link)
+        await db_main_data(value['fullname'], value['birthday'], link)
 
     wb.save(file)
     wb.close()
@@ -99,7 +98,9 @@ async def scan_subdir(subdir_path):
 
 """Move a subdirectory after processing.
 
-This moves the given subdirectory path to the archive directory if it does not already exist there. If the archive directory already contains a directory with the same name, it will log a message and not move it again. Any exceptions are also logged.
+This moves the given subdirectory path to the archive directory if it does not already exist there. 
+If the archive directory already contains a directory with the same name, 
+it will log a message and not move it again. Any exceptions are also logged.
 
 Args:
     subdir_path: The subdirectory path to move.
