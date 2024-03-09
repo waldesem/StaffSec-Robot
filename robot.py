@@ -39,8 +39,8 @@ async def main():
                 logging.error(e)
 
         tasks = [
-            parse_main(),
-            parse_inquiry(),
+            parse_main(Config.MAIN_FILE),
+            parse_inquiry(Config.INFO_FILE),
         ]
         await asyncio.gather(*tasks)
 

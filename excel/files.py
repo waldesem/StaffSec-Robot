@@ -24,11 +24,11 @@ archives processed records, and saves results to the database.
     - Saves record data to the database
 - Saves the updated main Excel file
 """
-async def parse_main():
-    wb = load_workbook(Config.MAIN_FILE, keep_vba=True)
+async def parse_main(file):
+    wb = load_workbook(file, keep_vba=True)
     ws = wb.worksheets[0]
 
-    subdirs = os.listdir(Config.WORK_DIR)
+    today_records = {}
     for i, cell in enumerate(ws["K10000":"K50000"], 10000):
         for c in cell:
             if (
@@ -37,50 +37,84 @@ async def parse_main():
                 and (c.value).date() == date.today()
             ):
                 fullname = name_convert(ws["B" + str(i)].value)
-                birthday = (
-                    (ws["C" + str(i)].value).date()
-                    if isinstance(ws["C" + str(i)].value, datetime)
-                    else date.today()
-                )
-                decision = ws[f"J{i}"].value
-                lnk = ""
-
-                for sub in subdirs:
-                    if name_convert(sub) == fullname:
-                        subdir_path = os.path.join(Config.WORK_DIR, sub)
-
-                        for file in os.listdir(subdir_path):
-                            if (
-                                file.startswith("Заключение")
-                                or file.startswith("Результаты")
-                            ) and (file.endswith("xlsm") or file.endswith("xlsx")):
-                                await screen_excel(subdir_path, file)
-                            elif file.endswith("json"):
-                                await screen_json(subdir_path, file)
-
-                        lnk = os.path.join(
+                today_records.update({
+                    str(i): {
+                        "fullname": fullname,
+                        "birthday": 
+                            ws["C" + str(record)].value.date()
+                            if isinstance(ws["C" + str(record)].value, datetime)
+                            else date.today(),
+                        "link": os.path.join(
                             Config.ARCHIVE_DIR,
-                            sub[0],
-                            f"{sub} - {ws['A' + str(i)].value}",
-                        )
-                        ws["L" + str(i)].hyperlink = str(lnk)
+                            fullname[0],
+                            f"{fullname.capitalize()} - {ws['A' + record].value}",
+                        ),
+                    }
+                })
+    
+    subdirs = os.listdir(Config.WORK_DIR)
+    for record in today_records:
+        link = ""
 
-                        try:
-                            if not os.path.isdir(lnk):
-                                shutil.move(subdir_path, lnk)
-                                logging.info(f"{sub} moved to {Config.ARCHIVE_DIR}")
-                            else:
-                                logging.info(f"{sub} already in {Config.ARCHIVE_DIR}")
-                        except Exception as e:
-                            logging.error(e)
+        for sub in subdirs:
+            if name_convert(sub) == record["fullname"]:
+                subdir_path = os.path.join(Config.WORK_DIR, sub)
 
-                        break
+                await scan_subdir(subdir_path)
 
-                await db_main_data(fullname, birthday, lnk)
+                link = record["link"]
+                if link:
+                    ws["L" + record].hyperlink = link
 
-    wb.save(Config.MAIN_FILE)
+                move_subdir(subdir_path, sub, link)
+
+                break
+
+        await db_main_data(record['fullname'], record['birthday'], link)
+
+    wb.save(file)
     wb.close()
     logging.info("Main file parsed")
+
+
+"""Parse all files in a subdirectory.
+
+This parses all files in the given subdirectory path that match certain 
+naming patterns. Excel files starting with "Заключение" or "Результаты" 
+are passed to screen_excel(). JSON files are passed to screen_json().
+
+Args:
+    subdir_path: The subdirectory path to parse files in.
+"""
+async def scan_subdir(subdir_path):
+    for file in os.listdir(subdir_path):
+        if (
+            file.startswith("Заключение")
+            or file.startswith("Результаты")
+        ) and (file.endswith("xlsm") or file.endswith("xlsx")):
+            await screen_excel(subdir_path, file)
+        elif file.endswith("json"):
+            await screen_json(subdir_path, file)
+
+
+"""Move a subdirectory after processing.
+
+This moves the given subdirectory path to the archive directory if it does not already exist there. If the archive directory already contains a directory with the same name, it will log a message and not move it again. Any exceptions are also logged.
+
+Args:
+    subdir_path: The subdirectory path to move.
+    sub: The name of the subdirectory.
+    link: The path to the archive directory.
+"""
+def move_subdir(subdir_path, sub, link):
+    try:
+        if not os.path.isdir(link):
+            shutil.move(subdir_path, link)
+            logging.info(f"{sub} moved to {Config.ARCHIVE_DIR}")
+        else:
+            logging.info(f"{sub} already in {Config.ARCHIVE_DIR}")
+    except Exception as e:
+        logging.error(e)
 
 
 """Parse the inquiry worksheet in the info Excel file.
@@ -92,8 +126,8 @@ fullname, and birthday, and saves to the database.
 After processing the whole worksheet, closes the workbook and logs 
 that the info file was parsed.
 """
-async def parse_inquiry():
-    wb = load_workbook(Config.INFO_FILE, keep_vba=True)
+async def parse_inquiry(file):
+    wb = load_workbook(file, keep_vba=True)
     ws = wb.worksheets[0]
     for i, cell in enumerate(ws["G500":"G5000"], 500):
         for c in cell:
