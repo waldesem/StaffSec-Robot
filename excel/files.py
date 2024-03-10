@@ -24,7 +24,7 @@ archives processed records, and saves results to the database.
     - Saves record data to the database
 - Saves the updated main Excel file
 """
-async def parse_main(file):
+def parse_main(file):
     wb = load_workbook(file, keep_vba=True)
     ws = wb.worksheets[0]
 
@@ -55,7 +55,7 @@ async def parse_main(file):
             if name_convert(sub) == value["fullname"]:
                 subdir_path = os.path.join(Config.WORK_DIR, sub)
 
-                await scan_subdir(subdir_path)
+                scan_subdir(subdir_path)
 
                 link = os.path.join(
                             Config.ARCHIVE_DIR,
@@ -69,7 +69,7 @@ async def parse_main(file):
 
                 break
 
-        await db_main_data(value['fullname'], value['birthday'], link)
+        db_main_data(value['fullname'], value['birthday'], link)
 
     wb.save(file)
     wb.close()
@@ -85,15 +85,15 @@ are passed to screen_excel(). JSON files are passed to screen_json().
 Args:
     subdir_path: The subdirectory path to parse files in.
 """
-async def scan_subdir(subdir_path):
+def scan_subdir(subdir_path):
     for file in os.listdir(subdir_path):
         if (
             file.startswith("Заключение")
             or file.startswith("Результаты")
         ) and (file.endswith("xlsm") or file.endswith("xlsx")):
-            await screen_excel(subdir_path, file)
+            screen_excel(subdir_path, file)
         elif file.endswith("json"):
-            await screen_json(subdir_path, file)
+            screen_json(subdir_path, file)
 
 
 """Move a subdirectory after processing.
@@ -127,7 +127,7 @@ fullname, and birthday, and saves to the database.
 After processing the whole worksheet, closes the workbook and logs 
 that the info file was parsed.
 """
-async def parse_inquiry(file):
+def parse_inquiry(file):
     wb = load_workbook(file, keep_vba=True)
     ws = wb.worksheets[0]
     for i, cell in enumerate(ws["G500":"G5000"], 500):
@@ -145,6 +145,6 @@ async def parse_inquiry(file):
                     if isinstance(ws[f"B{i}"].value, datetime)
                     else date.today()
                 )
-                await db_iquiry_data(info, initiator, fullname, birthday)
+                db_iquiry_data(info, initiator, fullname, birthday)
     wb.close()
     logging.info("Info file parsed")

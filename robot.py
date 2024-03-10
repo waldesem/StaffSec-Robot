@@ -2,7 +2,6 @@ import os
 import shutil
 from datetime import datetime, date
 import logging
-import asyncio
 
 from config import Config
 from excel.files import parse_inquiry, parse_main
@@ -13,18 +12,7 @@ logging.basicConfig(
 )
 
 
-"""
-main is an async function that runs the main robot logic.
-
-It checks if the main and info files were modified today. 
-If so, it archives them, logs the copy, and parses them by 
-calling parse_main and parse_inquiry async tasks.
-
-If the files were not changed, it just logs that info.
-
-Finally it logs how long the script took to run.
-"""
-async def main():
+def main():
     now = datetime.now()
 
     main_file_date = date.fromtimestamp(os.path.getmtime(Config.MAIN_FILE))
@@ -38,11 +26,8 @@ async def main():
             except Exception as e:
                 logging.error(e)
 
-        tasks = [
-            parse_main(Config.MAIN_FILE),
-            parse_inquiry(Config.INFO_FILE),
-        ]
-        await asyncio.gather(*tasks)
+        parse_main(Config.MAIN_FILE),
+        parse_inquiry(Config.INFO_FILE),
 
     else:
         logging.info("Files not changed")
@@ -51,4 +36,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -1,4 +1,4 @@
-import aiosqlite
+import sqlite3  
 
 from config import Config
 
@@ -13,15 +13,17 @@ Args:
 Returns: 
   The ID for the given name if found, otherwise 1.
 """
-async def get_item_id(table, column, name):
+def get_item_id(table, column, name):
     if not name:
         return 1
-    async with aiosqlite.connect(Config.DATABASE_URI) as conn:
-        async with conn.execute(
-            f"SELECT * FROM {table} WHERE LOWER ({column}) LIKE LOWER (?)", (name,)
-        ) as cursor:
-            result = await cursor.fetchone()
-            return result[0] if result else 1
+    
+    with sqlite3.connect(Config.DATABASE_URI) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+          f"SELECT * FROM {table} WHERE LOWER ({column}) LIKE LOWER (?)", (name,)
+        )
+        result = cursor.fetchone()
+        return result[0] if result else 1
 
 """Converts a full name to uppercase with spaces between words.
 

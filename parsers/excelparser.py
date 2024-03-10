@@ -20,7 +20,7 @@ This function loads the given Excel file, extracts resume and other data
 based on the sheet name and cell contents, converts names, gets item IDs,
 and inserts the data into the database if valid.
 """
-async def screen_excel(excel_path, excel_file):
+def screen_excel(excel_path, excel_file):
     workbook = load_workbook(os.path.join(excel_path, excel_file), keep_vba=True)
     worksheet = workbook.worksheets[0]
     person = {}
@@ -34,16 +34,16 @@ async def screen_excel(excel_path, excel_file):
                 and sheet["K3"].value
                 and sheet["L3"].value
             ):
-                person.update({"resume": await get_resume(sheet)})
+                person.update({"resume": get_resume(sheet)})
 
         if worksheet["C6"].value and worksheet["C8"].value:
-            person.update({"resume": await get_conclusion_resume(worksheet)})
+            person.update({"resume": get_conclusion_resume(worksheet)})
 
         if worksheet["C23"].value:
-            person.update({"check": await get_check(worksheet)})
+            person.update({"check": get_check(worksheet)})
     else:
-        person.update({"resume": await get_robot_resume(worksheet)})
-        person.update({"robot": await get_robot(worksheet)})
+        person.update({"resume": get_robot_resume(worksheet)})
+        person.update({"robot": get_robot(worksheet)})
 
     workbook.close()
 
@@ -52,7 +52,7 @@ async def screen_excel(excel_path, excel_file):
             person["resume"]["fullname"]
             and person["resume"]["birthday"] != date.today()
         ):
-            await excel_to_db(person)
+            excel_to_db(person)
 
 
 """Parses resume data from the given sheet.
@@ -63,7 +63,7 @@ Args:
 Returns: 
   A dict with the parsed resume fields.
 """
-async def get_resume(sheet):
+def get_resume(sheet):
     return {
         "fullname": name_convert(str(sheet["K3"].value)),
         "birthday": (
@@ -90,7 +90,7 @@ Args:
 Returns:
   A dict with the parsed resume conclusion fields.
 """
-async def get_conclusion_resume(sheet):
+def get_conclusion_resume(sheet):
     return {
         "fullname": name_convert(sheet["C6"].value),
         "birthday": (
@@ -113,7 +113,7 @@ Args:
 Returns:
   A dict with the parsed robot resume fields.
 """
-async def get_robot_resume(sheet):
+def get_robot_resume(sheet):
     return {
         "fullname": name_convert(sheet["B4"].value),
         "birthday": (
@@ -136,7 +136,7 @@ Args:
 Returns:
   A dict with the parsed check fields.
 """
-async def get_check(sheet):
+def get_check(sheet):
     return {
         "workplace": f"{sheet['C11'].value} - {sheet['D11'].value}; {sheet['C12'].value} - "
         f"{sheet['D12'].value}; {sheet['C13'].value} - {sheet['D13'].value}",
@@ -155,7 +155,7 @@ async def get_check(sheet):
             else True
         ),
         "addition": sheet["C28"].value,
-        "conclusion": await get_item_id(
+        "conclusion": get_item_id(
             "conclusions", "conclusion", sheet["C23"].value
         ),
         "deadline": datetime.now(),
@@ -171,7 +171,7 @@ Args:
 Returns:
   A dict with the parsed robot check fields.
 """
-async def get_robot(sheet):
+def get_robot(sheet):
     return {
         "employee": sheet["B27"].value,
         "terrorist": sheet["B17"].value,
