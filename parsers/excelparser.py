@@ -4,7 +4,7 @@ from datetime import date, datetime
 from openpyxl import load_workbook
 
 from database.dbase import excel_to_db
-from action.actions import name_convert, get_item_id
+from action.actions import normalize_name, get_item_id
 
 
 """Parses an Excel file to extract resume and other data.
@@ -65,7 +65,7 @@ Returns:
 """
 def get_resume(sheet):
     return {
-        "fullname": name_convert(str(sheet["K3"].value)),
+        "fullname": normalize_name(str(sheet["K3"].value)),
         "birthday": (
             (sheet["L3"].value).date()
             if isinstance(sheet["L3"].value, datetime)
@@ -92,7 +92,7 @@ Returns:
 """
 def get_conclusion_resume(sheet):
     return {
-        "fullname": name_convert(sheet["C6"].value),
+        "fullname": normalize_name(sheet["C6"].value),
         "birthday": (
             (sheet["C8"].value).date()
             if isinstance(sheet["C8"].value, datetime)
@@ -115,7 +115,7 @@ Returns:
 """
 def get_robot_resume(sheet):
     return {
-        "fullname": name_convert(sheet["B4"].value),
+        "fullname": normalize_name(sheet["B4"].value),
         "birthday": (
             (sheet["B5"].value).date()
             if isinstance(sheet["B5"].value, datetime)

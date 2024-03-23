@@ -9,7 +9,7 @@ from config import Config
 from parsers.excelparser import screen_excel
 from parsers.jsonparser import screen_json
 from database.dbase import db_iquiry_data, db_main_data
-from action.actions import name_convert
+from action.actions import normalize_name
 
 
 """Parses the main Excel file to get today's records, screens them, 
@@ -38,7 +38,7 @@ def parse_main(file):
             ):
                 today_records.update({
                     str(i): {
-                        "fullname": name_convert(ws["B" + str(i)].value),
+                        "fullname": normalize_name(ws["B" + str(i)].value),
                         "birthday": 
                             ws["C" + str(i)].value.date()
                             if isinstance(ws["C" + str(i)].value, datetime)
@@ -52,7 +52,7 @@ def parse_main(file):
         link = ""
 
         for sub in subdirs:
-            if name_convert(sub) == value["fullname"]:
+            if normalize_name(sub) == value["fullname"]:
                 subdir_path = os.path.join(Config.WORK_DIR, sub)
 
                 scan_subdir(subdir_path)
@@ -139,7 +139,7 @@ def parse_inquiry(file):
             ):
                 info = ws[f"E{i}"].value
                 initiator = ws[f"F{i}"].value
-                fullname = name_convert(ws[f"A{i}"].value)
+                fullname = normalize_name(ws[f"A{i}"].value)
                 birthday = (
                     (ws[f"B{i}"].value).date()
                     if isinstance(ws[f"B{i}"].value, datetime)

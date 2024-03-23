@@ -37,5 +37,5 @@ Args:
 Returns:
   The converted uppercase name with spaces.
 """
-def name_convert(fullname: str) -> str:
+def normalize_name(fullname: str) -> str:
     return " ".join(filter(None, map(str.strip, fullname.split()))).upper()
