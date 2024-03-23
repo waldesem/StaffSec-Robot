@@ -26,60 +26,25 @@ def screen_excel(excel_path, excel_file):
     person = {}
 
     if excel_file.startswith("Заключение"):
-        if len(workbook.sheetnames) > 1:
-            sheet = workbook.worksheets[1]
-
-            if (
-                str(sheet["K1"].value) == "ФИО"
-                and sheet["K3"].value
-                and sheet["L3"].value
-            ):
-                person.update({"resume": get_resume(sheet)})
-
         if worksheet["C6"].value and worksheet["C8"].value:
             person.update({"resume": get_conclusion_resume(worksheet)})
-
         if worksheet["C23"].value:
             person.update({"check": get_check(worksheet)})
-    else:
+
+    elif excel_file.startswith("Результаты"):
         person.update({"resume": get_robot_resume(worksheet)})
         person.update({"robot": get_robot(worksheet)})
 
     workbook.close()
 
-    if "resume" in person:
+    if "resume" in person and (
+        "fullname" in person["resume"] and "birthday" in person["resume"]
+    ):
         if (
             person["resume"]["fullname"]
             and person["resume"]["birthday"] != date.today()
         ):
             excel_to_db(person)
-
-
-"""Parses resume data from the given sheet.
-
-Args:
-  sheet: The sheet containing resume data.
-
-Returns: 
-  A dict with the parsed resume fields.
-"""
-def get_resume(sheet):
-    return {
-        "fullname": normalize_name(str(sheet["K3"].value)),
-        "birthday": (
-            (sheet["L3"].value).date()
-            if isinstance(sheet["L3"].value, datetime)
-            else (
-                datetime.strptime(sheet["L3"].value, "%d.%m.%Y").date()
-                if sheet["L3"].value
-                else date.today()
-            )
-        ),
-        "birthplace": str(sheet["M3"].value).strip(),
-        "country": str(sheet["T3"].value).strip(),
-        "snils": str(sheet["U3"].value).strip(),
-        "inn": str(sheet["V3"].value).strip(),
-    }
 
 
 """Parses resume conclusion data from the given sheet.
