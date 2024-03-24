@@ -87,10 +87,7 @@ Args:
 """
 def scan_subdir(subdir_path):
     for file in os.listdir(subdir_path):
-        if (
-            file.startswith("Заключение")
-            or file.startswith("Результаты")
-        ) and (file.endswith("xlsm") or file.endswith("xlsx")):
+        if file.endswith("xlsm") or file.endswith("xlsx"):
             screen_excel(subdir_path, file)
         elif file.endswith("json"):
             screen_json(subdir_path, file)

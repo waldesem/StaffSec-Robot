@@ -22,7 +22,7 @@ def main():
         for file in [Config.MAIN_FILE, Config.INFO_FILE, Config.DATABASE_URI]:
             try:
                 shutil.copy(file, Config.ARCHIVE_DIR)
-                logging.info(f"{file} copied to {Config.ARCHIVE_DIR}")
+                logging.info(f"{file} backuped")
             except Exception as e:
                 logging.error(e)
 

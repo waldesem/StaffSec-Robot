@@ -106,7 +106,7 @@ def json_to_db(json_data):
             "affilations",
         ]
         items_lists = [
-            json_data["staff"],
+            json_data["staffs"],
             json_data["documents"],
             json_data["addresses"],
             json_data["contacts"],
