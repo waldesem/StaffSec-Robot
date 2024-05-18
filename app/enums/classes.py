@@ -9,7 +9,7 @@ class Regions(Enum):
     WEST_REGION = "Региональный центр Запад"
     URAL_REGION = "Региональный центр Урал"
     EAST_REGION = "Региональный центр Восток"
-    
+
 
 class Categories(Enum):
     """Category"""

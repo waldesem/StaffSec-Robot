@@ -1,10 +1,9 @@
-import os
-import json
 from datetime import datetime
+import json
+import os
 
+from action.actions import normalize_name, get_item_id, get_items
 from enums.classes import Categories, Statuses
-from database.dbase import json_to_db
-from action.actions import normalize_name, get_item_id
 
 
 def screen_json(json_path, json_file):
@@ -12,13 +11,13 @@ def screen_json(json_path, json_file):
     with open(file, "r", newline="", encoding="utf-8-sig") as f:
         json_dict = json.load(f)
         json_data = dict(
-            resume = {},
-            addresses = [],
-            contacts = [],
-            workplaces = [],
-            documents = [],
-            staffs = [],
-            affilation = [],
+            resume={},
+            addresses=[],
+            contacts=[],
+            workplaces=[],
+            documents=[],
+            staffs=[],
+            affilations=[],
         )
 
         json_data["resume"]["category_id"] = get_item_id(
@@ -31,10 +30,13 @@ def screen_json(json_path, json_file):
             match key:
                 case "department":
                     region_id = 1
-                    for div in value.split("/"):
-                        region = get_item_id("regions", "region", div)
-                        if region:
-                            region_id = region
+                    regions = get_items("regions")
+                    for k_reg, v_reg in regions.items():
+                        if v_reg.upper() in [
+                            val.upper().strip() for val in value.split("/")
+                        ]:
+                            region_id = k_reg
+                            break
                     json_data["resume"]["region_id"] = region_id
                 case "lastName":
                     firstName = json_dict["firstName"]
@@ -65,7 +67,7 @@ def screen_json(json_path, json_file):
                     json_data["resume"]["birthplace"] = value
                 case "citizen":
                     json_data["resume"]["country"] = value
-                case "ext_country":
+                case "additionalCitizenship":
                     json_data["resume"]["ext_country"] = value
                 case "snils":
                     json_data["resume"]["snils"] = value
@@ -145,7 +147,7 @@ def screen_json(json_path, json_file):
                                 "name": f"{item.get('name', '')}",
                                 "position": f"{item.get('position', '')}",
                             }
-                            json_data["affilation"].append(public)
+                            json_data["affilations"].append(public)
 
                 case "stateOrganizations":
                     if len(json_dict["stateOrganizations"]):
@@ -155,7 +157,7 @@ def screen_json(json_path, json_file):
                                 "name": f"{item.get('name', '')}",
                                 "position": f"{item.get('position', '')}",
                             }
-                            json_data["affilation"].append(state)
+                            json_data["affilations"].append(state)
 
                 case "relatedPersonsOrganizations":
                     if len(json_dict["relatedPersonsOrganizations"]):
@@ -166,7 +168,7 @@ def screen_json(json_path, json_file):
                                 "position": f"{item.get('position', '')}",
                                 "inn": f"{item.get('inn'), ''}",
                             }
-                            json_data["affilation"].append(related)
+                            json_data["affilations"].append(related)
 
                 case "organizations":
                     if len(json_dict["organizations"]):
@@ -177,5 +179,5 @@ def screen_json(json_path, json_file):
                                 "position": f"{item.get('workCombinationTime', '')}",
                                 "inn": f"{item.get('inn'), ''}",
                             }
-                            json_data["affilation"].append(organization)
-        json_to_db(dict(json_data))
+                            json_data["affilations"].append(organization)
+        return json_data
