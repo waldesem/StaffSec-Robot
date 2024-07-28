@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime#, timedelta
 import os
 import sqlite3
 
@@ -32,7 +32,7 @@ def get_file_timestamp(file):
 
 def check_date(data):
     if data and isinstance(data, datetime):
-        return data.date() == date.today()
+        return data.date() == date.today()# - timedelta(days=1)
 
 
 def check_birthday(data: datetime):

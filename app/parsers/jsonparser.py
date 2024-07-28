@@ -30,13 +30,14 @@ def screen_json(json_path, json_file):
             match key:
                 case "department":
                     region_id = 1
-                    regions = get_items("regions")
-                    for k_reg, v_reg in regions.items():
-                        if v_reg.upper() in [
-                            val.upper().strip() for val in value.split("/")
-                        ]:
-                            region_id = k_reg
-                            break
+                    if json_dict['department']:
+                        regions = get_items("regions")
+                        for k_reg, v_reg in regions.items():
+                            if v_reg.upper() in [
+                                val.upper().strip() for val in value.split("/")
+                            ]:
+                                region_id = k_reg
+                                break
                     json_data["resume"]["region_id"] = region_id
                 case "lastName":
                     firstName = json_dict["firstName"]

@@ -17,8 +17,7 @@ def db_main_data(fullname, birthday, url):
         result = cursor.fetchone()
         if not result:
             cursor.execute(
-                f"INSERT INTO persons (fullname, birthday, path, created, category_id, region_id, status_id) "
-                f"VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO persons (fullname, birthday, path, created, category_id, region_id, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     fullname,
                     birthday,
@@ -104,7 +103,7 @@ def json_to_db(json_data: dict):
                         tuple(item.values()),
                     )
         conn.commit()
-
+        
 
 def excel_to_db(excel):
     if "resume" in excel:
@@ -145,11 +144,5 @@ def excel_to_db(excel):
                     f"INSERT INTO checks ({','.join(excel['check'].keys())},person_id) "
                     f"VALUES ({','.join(['?'] * len(excel['check'].values()))},?)",
                     tuple(excel["check"].values()) + (person_id,),
-                )
-            if "robot" in excel:
-                cursor.execute(
-                    f"INSERT INTO robots ({','.join(excel['robot'].keys())}, person_id) "
-                    f"VALUES ({','.join(['?'] * len(excel['robot'].values()))}, ?)",
-                    tuple(excel["robot"].values()) + (person_id,),
                 )
             conn.commit()
